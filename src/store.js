@@ -156,9 +156,14 @@ async function ensureMariaDbSchema() {
     CREATE TABLE IF NOT EXISTS equipment_items (
       id CHAR(36) PRIMARY KEY,
       slug VARCHAR(255) NOT NULL UNIQUE,
-      label VARCHAR(255) NOT NULL,
+      label TEXT NOT NULL,
       created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
     ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+  `);
+
+  await db.query(`
+    ALTER TABLE equipment_items
+    MODIFY COLUMN label TEXT NOT NULL
   `);
 
   await db.query(`
