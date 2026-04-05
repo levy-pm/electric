@@ -8,6 +8,7 @@ const sanitizeFilename = require('sanitize-filename');
 const { config } = require('./config');
 const { buildEquipmentEntries } = require('./equipment');
 const { extractVehicleFromPdf } = require('./gemini');
+const { importVehicleFromUrl } = require('./url-import');
 const { enrichVehicles } = require('./recommendation');
 const store = require('./store');
 
@@ -44,6 +45,9 @@ function toClientVehicle(vehicle) {
   const equipmentEntries = buildEquipmentEntries(vehicle);
   const allEquipment = [...new Map(equipmentEntries.map((entry) => [entry.slug, entry.label])).values()];
   const equipmentSlugs = [...new Set(equipmentEntries.map((entry) => entry.slug))];
+  const configurationDownloadUrl =
+    vehicle.sourceType === 'upload' ? `/api/uploads/${vehicle.uploadId}/file` : null;
+  const configurationSourceUrl = vehicle.sourceType === 'url' ? vehicle.sourceUrl : null;
 
   return {
     ...vehicle,
@@ -52,6 +56,8 @@ function toClientVehicle(vehicle) {
     equipmentPackagesCount: Array.isArray(vehicle.equipmentPackages) ? vehicle.equipmentPackages.length : 0,
     allEquipment,
     equipmentSlugs,
+    configurationDownloadUrl,
+    configurationSourceUrl,
   };
 }
 
@@ -131,6 +137,23 @@ async function createApp() {
     });
   }));
 
+  app.get('/api/uploads/:uploadId/file', asyncRoute(async (req, res) => {
+    const uploadEntry = await store.getUploadById(req.params.uploadId);
+    if (!uploadEntry || uploadEntry.sourceType !== 'upload' || !uploadEntry.storedName) {
+      res.status(404).json({ error: 'Nie znaleziono pliku konfiguracji.' });
+      return;
+    }
+
+    const safeName = path.basename(uploadEntry.storedName);
+    const filePath = path.join(config.uploadDir, safeName);
+    if (!fs.existsSync(filePath)) {
+      res.status(404).json({ error: 'Plik konfiguracji nie istnieje na serwerze.' });
+      return;
+    }
+
+    res.download(filePath, uploadEntry.originalName || safeName);
+  }));
+
   app.post('/api/upload', uploadLimiter, upload.single('configurationPdf'), asyncRoute(async (req, res) => {
     if (!req.file) {
       res.status(400).json({ error: 'Nie przeslano pliku PDF.' });
@@ -151,6 +174,43 @@ async function createApp() {
       res.status(201).json({
         message: 'Plik zostal odczytany i dodany do tabeli.',
         uploadId: uploadEntry.id,
+        items: vehicles.map(toClientVehicle),
+      });
+    } catch (error) {
+      await store.markUploadFailed(uploadEntry.id, error.message);
+      throw error;
+    }
+  }));
+
+  app.post('/api/import-url', uploadLimiter, asyncRoute(async (req, res) => {
+    const sourceUrl = String(req.body && req.body.url ? req.body.url : '').trim();
+    if (!sourceUrl) {
+      res.status(400).json({ error: 'Podaj link do konfiguracji.' });
+      return;
+    }
+
+    const uploadEntry = await store.createUpload({
+      sourceType: 'url',
+      sourceUrl,
+      originalName: 'Link konfiguracji',
+      storedName: '',
+      mimeType: 'text/html',
+      sizeBytes: 0,
+    });
+
+    try {
+      const extraction = await importVehicleFromUrl(sourceUrl);
+      const vehicles = extraction.vehicles.map((vehicle) => ({
+        ...vehicle,
+        createdAt: new Date().toISOString(),
+      }));
+
+      await store.markUploadCompleted(uploadEntry.id, vehicles);
+
+      res.status(201).json({
+        message: 'Link zostal odczytany i dodany do tabeli.',
+        uploadId: uploadEntry.id,
+        parser: extraction.parser,
         items: vehicles.map(toClientVehicle),
       });
     } catch (error) {

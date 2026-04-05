@@ -14,70 +14,183 @@
         <div class="brand-block">
           <span class="eyebrow">Panel konfiguratorów EV</span>
           <h1>electric.motometr.pl</h1>
-          <p>Wgraj PDF konfiguratora, a system sam zbuduje porównywalną tabelę modeli.</p>
+          <p>Dodawaj PDF-y lub linki do konfiguratorów i porównuj elektryki w jednej, czytelnej tabeli.</p>
         </div>
 
-        <div class="toolbar">
-          <label class="search-box">
-            <span>Szukaj</span>
-            <input id="searchInput" type="search" placeholder="Marka, model, wyposażenie, kolor..." />
-          </label>
-
+        <div class="header-actions">
           <button id="columnsButton" class="secondary-button" type="button">Kolumny</button>
           <button id="uploadButton" class="primary-button" type="button">Wgraj konfigurację</button>
-          <input id="uploadInput" type="file" accept="application/pdf,.pdf" hidden />
         </div>
       </header>
 
-      <main class="content-grid">
+      <main class="page-content">
         <section class="summary-panel">
           <article class="hero-card">
             <span class="eyebrow">Rekomendacja systemu</span>
             <h2 id="topCarName">Brak danych</h2>
-            <p id="topCarMeta">Dodaj pierwszy PDF konfiguratora, aby zobaczyć najlepszą propozycję.</p>
+            <p id="topCarMeta">Dodaj pierwszą konfigurację, aby zobaczyć najlepszą propozycję.</p>
             <div id="topCarBadges" class="badge-row"></div>
           </article>
 
           <div id="leaderCards" class="leader-grid"></div>
         </section>
 
-        <section class="table-panel">
-          <div class="panel-header">
-            <div>
-              <h2>Porównanie konfiguracji</h2>
-              <p>Sortuj, filtruj, ukrywaj kolumny i zmieniaj ich kolejność przeciągając nagłówki.</p>
+        <section class="workspace-grid">
+          <aside class="filters-panel">
+            <div class="panel-heading">
+              <div>
+                <span class="eyebrow">Filtry</span>
+                <h2>Znajdź właściwą konfigurację</h2>
+              </div>
+              <button id="clearFiltersButton" class="text-button" type="button">Wyczyść</button>
             </div>
-            <div id="statusMessage" class="status-message" aria-live="polite"></div>
-          </div>
 
-          <div class="facet-toolbar">
-            <span class="facet-label">Filtr wyposażenia</span>
-            <div id="equipmentFilters" class="facet-chips"></div>
-          </div>
+            <label class="field">
+              <span>Szukaj</span>
+              <input
+                id="searchInput"
+                type="search"
+                placeholder="Marka, model, kolor, pakiet, wyposażenie..."
+              />
+            </label>
 
-          <div id="tableContainer"></div>
+            <div class="field">
+              <div class="field-label-row">
+                <span>Wyposażenie</span>
+                <button id="clearEquipmentButton" class="text-button" type="button">Wyczyść wybór</button>
+              </div>
+
+              <div id="equipmentSelect" class="multi-select">
+                <button
+                  id="equipmentSelectButton"
+                  class="multi-select-trigger"
+                  type="button"
+                  aria-expanded="false"
+                  aria-controls="equipmentDropdown"
+                >
+                  <span id="equipmentSelectLabel">Wybierz elementy wyposażenia</span>
+                  <span class="multi-select-chevron" aria-hidden="true">▾</span>
+                </button>
+
+                <div id="equipmentDropdown" class="multi-select-dropdown" hidden>
+                  <label class="multi-select-search">
+                    <span class="sr-only">Szukaj wyposażenia</span>
+                    <input
+                      id="equipmentSearchInput"
+                      type="search"
+                      placeholder="Szukaj po nazwie wyposażenia..."
+                    />
+                  </label>
+
+                  <div id="equipmentSelectedChips" class="selected-chip-list"></div>
+                  <div id="equipmentOptions" class="multi-select-options"></div>
+                </div>
+              </div>
+            </div>
+          </aside>
+
+          <section class="table-panel">
+            <div class="panel-header">
+              <div>
+                <h2>Porównanie konfiguracji</h2>
+                <p>Sortuj, ukrywaj kolumny i zmieniaj ich kolejność przeciągając nagłówki.</p>
+              </div>
+
+              <div id="statusMessage" class="status-message" aria-live="polite"></div>
+            </div>
+
+            <div class="table-scroll-shell">
+              <div id="tableContainer"></div>
+            </div>
+          </section>
         </section>
       </main>
     </div>
 
     <aside id="columnsDrawer" class="drawer" aria-hidden="true">
       <div class="drawer-backdrop" data-close-drawer="true"></div>
+
       <div class="drawer-panel">
         <div class="drawer-header">
           <div>
             <span class="eyebrow">Widok tabeli</span>
             <h2>Kolumny</h2>
           </div>
-          <button id="closeColumnsButton" class="icon-button" type="button" aria-label="Zamknij">×</button>
+
+          <button id="closeColumnsButton" class="icon-button" type="button" aria-label="Zamknij panel kolumn">
+            ×
+          </button>
         </div>
 
         <p class="drawer-copy">
-          Włączaj i wyłączaj kolumny. Kolejność ustawiasz bezpośrednio w tabeli przeciągając nagłówki.
+          Włączaj i wyłączaj kolumny. Ich kolejność ustawiasz bezpośrednio w tabeli.
         </p>
+
+        <div class="drawer-actions">
+          <button id="showAllColumnsButton" class="secondary-button" type="button">Pokaż wszystkie</button>
+          <button id="resetColumnsButton" class="secondary-button" type="button">Widok domyślny</button>
+        </div>
 
         <div id="columnsList" class="columns-list"></div>
       </div>
     </aside>
+
+    <div id="importModal" class="modal" aria-hidden="true">
+      <div class="modal-backdrop" data-close-modal="true"></div>
+
+      <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="importModalTitle">
+        <div class="modal-header">
+          <div>
+            <span class="eyebrow">Nowa konfiguracja</span>
+            <h2 id="importModalTitle">Dodaj konfigurację</h2>
+          </div>
+
+          <button id="closeImportButton" class="icon-button" type="button" aria-label="Zamknij okno dodawania">
+            ×
+          </button>
+        </div>
+
+        <div class="modal-tabs" role="tablist" aria-label="Źródło konfiguracji">
+          <button id="importFileTab" class="tab-button is-active" type="button" data-import-tab="file">
+            Wgraj PDF
+          </button>
+          <button id="importUrlTab" class="tab-button" type="button" data-import-tab="url">
+            Wklej link
+          </button>
+        </div>
+
+        <div id="importFilePanel" class="modal-tab-panel is-active">
+          <label class="upload-dropzone" for="modalUploadInput">
+            <span class="upload-title">Wybierz plik PDF</span>
+            <span class="upload-copy">Renault, Volkswagen, Kia i inne pliki z konfiguratora możesz dodać tutaj.</span>
+            <span class="upload-pill">PDF do 20 MB</span>
+          </label>
+          <input id="modalUploadInput" type="file" accept="application/pdf,.pdf" hidden />
+          <p id="selectedFileName" class="field-hint">Nie wybrano pliku.</p>
+        </div>
+
+        <div id="importUrlPanel" class="modal-tab-panel" hidden>
+          <label class="field">
+            <span>Link do konfiguracji</span>
+            <input
+              id="configurationUrlInput"
+              type="url"
+              placeholder="https://www.honda.pl/SUokuD lub https://www.ford.pl/s/aT6u"
+            />
+          </label>
+          <p class="field-hint">
+            Na start obsługiwane są linki Honda, Ford i bezpośrednie linki do PDF.
+          </p>
+        </div>
+
+        <div id="importModalStatus" class="modal-status" aria-live="polite"></div>
+
+        <div class="modal-actions">
+          <button id="cancelImportButton" class="secondary-button" type="button">Anuluj</button>
+          <button id="confirmImportButton" class="primary-button" type="button">Dodaj</button>
+        </div>
+      </div>
+    </div>
 
     <script src="/vendor/tabulator/js/tabulator.min.js"></script>
     <script src="/app.js" defer></script>

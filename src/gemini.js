@@ -3,7 +3,7 @@ const { GoogleGenAI, createPartFromUri, createUserContent } = require('@google/g
 const { config, validateConfig } = require('./config');
 const { geminiVehicleResponseJsonSchema, normalizeVehicleExtraction } = require('./schema');
 
-function buildPrompt(originalName) {
+function buildPdfPrompt(originalName) {
   return [
     'Przeanalizuj zalaczony PDF konfiguratora auta elektrycznego.',
     `Nazwa pliku: ${originalName}.`,
@@ -26,6 +26,64 @@ function buildPrompt(originalName) {
   ].join(' ');
 }
 
+function buildTextPrompt(sourceLabel, sourceText) {
+  return [
+    'Przeanalizuj tekst z konfiguratora auta elektrycznego.',
+    `Zrodlo: ${sourceLabel}.`,
+    'Tekst moze pochodzic ze strony producenta albo z wyciagu HTML.',
+    'Bierz pod uwage tylko informacje, ktore sa jednoznaczne w tresci.',
+    'Jesli pole jest nieznane, pomin je. Nie zgaduj.',
+    'Ceny zwracaj jako liczby calkowite w PLN bez spacji i waluty.',
+    'Moc zwracaj osobno w kW i KM, zasieg w km WLTP, zuzycie energii w kWh/100 km, bateria w kWh.',
+    'additionalEquipment to platne lub wybrane opcje dodatkowe.',
+    'standardEquipment to wyposazenie podstawowe samochodu.',
+    'equipmentPackages to same nazwy pakietow.',
+    'Kazdy element wyposazenia zwracaj jako osobny item tablicy.',
+    'Uzywaj powtarzalnych, kanonicznych etykiet funkcji, np. "Wyswietlacz HUD", "Pompa ciepla", "Podgrzewana kierownica".',
+    'displayName powinno byc pelna nazwa skonfigurowanej wersji.',
+    'basePricePln to cena bazowej wersji z podsumowania wersji.',
+    'totalPricePln to finalna cena konfiguracji.',
+    'configurationCode i sourceDate wypelnij tylko, gdy sa jawnie podane.',
+    'W notes wpisz rzeczy przydatne, ktorych nie ma w polach glownych.',
+    'W warnings wpisz watpliwosci, np. brak ceny bazowej albo brak baterii.',
+    'PONIZEJ TRESC ZRODLOWA:',
+    sourceText,
+  ].join('\n\n');
+}
+
+async function generateVehicleExtraction(contents) {
+  validateConfig({ allowMissingGemini: false });
+  const ai = new GoogleGenAI({ apiKey: config.geminiApiKey });
+  const response = await ai.models.generateContent({
+    model: config.geminiModel,
+    contents,
+    config: {
+      temperature: 0.1,
+      responseMimeType: 'application/json',
+      responseJsonSchema: geminiVehicleResponseJsonSchema,
+    },
+  });
+
+  const rawText = (response && response.text ? response.text : '').trim();
+  if (!rawText) {
+    throw new Error('Gemini nie zwrocil danych.');
+  }
+
+  const parsedPayload = JSON.parse(rawText);
+  const normalizedVehicle = normalizeVehicleExtraction(parsedPayload);
+
+  return {
+    rawText,
+    rawPayload: parsedPayload,
+    vehicles: [
+      {
+        id: randomUUID(),
+        ...normalizedVehicle,
+      },
+    ],
+  };
+}
+
 async function extractVehicleFromPdf(filePath, originalName) {
   validateConfig({ allowMissingGemini: false });
   const ai = new GoogleGenAI({ apiKey: config.geminiApiKey });
@@ -38,37 +96,12 @@ async function extractVehicleFromPdf(filePath, originalName) {
   });
 
   try {
-    const response = await ai.models.generateContent({
-      model: config.geminiModel,
-      contents: createUserContent([
+    return generateVehicleExtraction(
+      createUserContent([
         createPartFromUri(uploadedFile.uri, uploadedFile.mimeType),
-        buildPrompt(originalName),
-      ]),
-      config: {
-        temperature: 0.1,
-        responseMimeType: 'application/json',
-        responseJsonSchema: geminiVehicleResponseJsonSchema,
-      },
-    });
-
-    const rawText = (response && response.text ? response.text : '').trim();
-    if (!rawText) {
-      throw new Error('Gemini nie zwrocil danych.');
-    }
-
-    const parsedPayload = JSON.parse(rawText);
-    const normalizedVehicle = normalizeVehicleExtraction(parsedPayload);
-
-    return {
-      rawText,
-      rawPayload: parsedPayload,
-      vehicles: [
-        {
-          id: randomUUID(),
-          ...normalizedVehicle,
-        },
-      ],
-    };
+        buildPdfPrompt(originalName),
+      ])
+    );
   } finally {
     if (uploadedFile && uploadedFile.name) {
       await ai.files.delete({ name: uploadedFile.name }).catch(() => {});
@@ -76,6 +109,16 @@ async function extractVehicleFromPdf(filePath, originalName) {
   }
 }
 
+async function extractVehicleFromSourceText(sourceLabel, sourceText) {
+  const trimmedText = String(sourceText || '').trim();
+  if (!trimmedText) {
+    throw new Error('Brak tresci do analizy.');
+  }
+
+  return generateVehicleExtraction(buildTextPrompt(sourceLabel, trimmedText));
+}
+
 module.exports = {
   extractVehicleFromPdf,
+  extractVehicleFromSourceText,
 };

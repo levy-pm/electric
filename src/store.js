@@ -32,6 +32,8 @@ function mapVehicleRow(row) {
   return {
     id: row.id,
     uploadId: row.upload_id,
+    sourceType: row.source_type || 'upload',
+    sourceUrl: row.source_url || null,
     brand: row.brand,
     model: row.model,
     versionName: row.version_name,
@@ -97,12 +99,17 @@ async function ensureMariaDbSchema() {
       stored_name VARCHAR(255) NOT NULL,
       mime_type VARCHAR(100) NOT NULL,
       size_bytes BIGINT NOT NULL,
+      source_type VARCHAR(16) NOT NULL DEFAULT 'upload',
+      source_url TEXT NULL,
       parse_status VARCHAR(32) NOT NULL DEFAULT 'pending',
       parse_error TEXT NULL,
       uploaded_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       parsed_at DATETIME NULL
     ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
   `);
+
+  await db.query(`ALTER TABLE uploads ADD COLUMN IF NOT EXISTS source_type VARCHAR(16) NOT NULL DEFAULT 'upload'`);
+  await db.query(`ALTER TABLE uploads ADD COLUMN IF NOT EXISTS source_url TEXT NULL`);
 
   await db.query(`
     CREATE TABLE IF NOT EXISTS vehicles (
@@ -175,13 +182,16 @@ async function initStore() {
   }
 }
 
-async function createUpload(file) {
+async function createUpload(input) {
+  const isFileUpload = Boolean(input && input.originalname);
   const upload = {
     id: randomUUID(),
-    originalName: file.originalname,
-    storedName: file.filename,
-    mimeType: file.mimetype,
-    sizeBytes: file.size,
+    originalName: isFileUpload ? input.originalname : input.originalName || 'Link konfiguracji',
+    storedName: isFileUpload ? input.filename : input.storedName || '',
+    mimeType: isFileUpload ? input.mimetype : input.mimeType || 'text/html',
+    sizeBytes: isFileUpload ? input.size : input.sizeBytes || 0,
+    sourceType: isFileUpload ? 'upload' : input.sourceType || 'url',
+    sourceUrl: isFileUpload ? null : input.sourceUrl || null,
     parseStatus: 'processing',
     uploadedAt: new Date().toISOString(),
   };
@@ -193,9 +203,17 @@ async function createUpload(file) {
 
   const db = await initMariaDbPool();
   await db.execute(
-    `INSERT INTO uploads (id, original_name, stored_name, mime_type, size_bytes, parse_status)
-     VALUES (?, ?, ?, ?, ?, 'processing')`,
-    [upload.id, upload.originalName, upload.storedName, upload.mimeType, upload.sizeBytes]
+    `INSERT INTO uploads (id, original_name, stored_name, mime_type, size_bytes, source_type, source_url, parse_status)
+     VALUES (?, ?, ?, ?, ?, ?, ?, 'processing')`,
+    [
+      upload.id,
+      upload.originalName,
+      upload.storedName,
+      upload.mimeType,
+      upload.sizeBytes,
+      upload.sourceType,
+      upload.sourceUrl,
+    ]
   );
 
   return upload;
@@ -331,12 +349,52 @@ async function markUploadFailed(uploadId, errorMessage) {
 async function listVehicles() {
   if (config.dbMode === 'memory') {
     return [...memoryState.vehicles.values()]
+      .map((vehicle) => {
+        const upload = memoryState.uploads.get(vehicle.uploadId);
+        return {
+          ...vehicle,
+          sourceType: upload ? upload.sourceType : 'upload',
+          sourceUrl: upload ? upload.sourceUrl || null : null,
+        };
+      })
       .sort((left, right) => new Date(right.createdAt || 0) - new Date(left.createdAt || 0));
   }
 
   const db = await initMariaDbPool();
-  const [rows] = await db.query(`SELECT * FROM vehicles ORDER BY created_at DESC`);
+  const [rows] = await db.query(`
+    SELECT
+      v.*,
+      u.source_type,
+      u.source_url
+    FROM vehicles v
+    JOIN uploads u ON u.id = v.upload_id
+    ORDER BY v.created_at DESC
+  `);
   return rows.map(mapVehicleRow);
+}
+
+async function getUploadById(uploadId) {
+  if (config.dbMode === 'memory') {
+    return memoryState.uploads.get(uploadId) || null;
+  }
+
+  const db = await initMariaDbPool();
+  const [rows] = await db.execute(`SELECT * FROM uploads WHERE id = ? LIMIT 1`, [uploadId]);
+  if (!rows.length) {
+    return null;
+  }
+
+  const row = rows[0];
+  return {
+    id: row.id,
+    originalName: row.original_name,
+    storedName: row.stored_name,
+    mimeType: row.mime_type,
+    sizeBytes: row.size_bytes,
+    sourceType: row.source_type || 'upload',
+    sourceUrl: row.source_url || null,
+    parseStatus: row.parse_status,
+  };
 }
 
 async function upsertEquipmentItem(connection, entry) {
@@ -400,4 +458,5 @@ module.exports = {
   markUploadFailed,
   listVehicles,
   listEquipmentFacets,
+  getUploadById,
 };
