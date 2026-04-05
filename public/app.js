@@ -16,6 +16,9 @@ const DEFAULT_HIDDEN_FIELDS = new Set([
   'configurationCode',
   'sourceDate',
   'notes',
+  'equipmentPackages',
+  'additionalEquipmentCount',
+  'energyConsumptionKwh100km',
 ]);
 
 const state = {
@@ -35,10 +38,10 @@ const state = {
 };
 
 const leaderLabels = {
-  bestPrice: 'Najlepsza cena',
-  bestRange: 'Największy zasięg',
-  bestBattery: 'Największa bateria',
-  bestEquipment: 'Najbogatsze wyposażenie',
+  bestPrice: '💰 Najlepsza cena',
+  bestRange: '🔋 Największy zasięg',
+  bestBattery: '⚡ Największa bateria',
+  bestEquipment: '🌿 Najbardziej ekologiczne wyposażenie',
 };
 
 function currencyFormatter(value) {
@@ -88,8 +91,12 @@ function getEyeIcon() {
 
 function rowBadgeFormatter(cell) {
   const badges = cell.getValue();
+  const isTop = cell.getRow().getData().isSuggestedTop;
+
   if (!Array.isArray(badges) || !badges.length) {
-    return '<span class="row-badge">Bez wyróżnienia</span>';
+    return isTop
+      ? '<span class="row-badge row-badge--recommended">Rekomendacja AI ★</span>'
+      : '<span class="row-badge">Bez wyróżnienia</span>';
   }
 
   return badges.map((badge) => `<span class="row-badge">${escapeHtml(badge)}</span>`).join('');
@@ -108,6 +115,32 @@ function openConfiguration(rowData) {
   if (rowData.configurationDownloadUrl) {
     window.location.assign(rowData.configurationDownloadUrl);
   }
+}
+
+function showNotification(message, isError = false, duration = 3000) {
+  // Remove existing notifications
+  const existingToasts = document.querySelectorAll('.toast-notification');
+  existingToasts.forEach(toast => toast.remove());
+
+  // Create new toast
+  const toast = document.createElement('div');
+  toast.className = `toast-notification ${isError ? 'toast-error' : 'toast-success'}`;
+  toast.innerHTML = `
+    <div class="toast-content">
+      <span class="toast-icon">${isError ? '⚠️' : '✅'}</span>
+      <span class="toast-message">${message}</span>
+    </div>
+    <button class="toast-close" onclick="this.parentElement.remove()">×</button>
+  `;
+
+  document.body.appendChild(toast);
+
+  // Auto remove after duration
+  setTimeout(() => {
+    if (toast.parentElement) {
+      toast.remove();
+    }
+  }, duration);
 }
 
 function configurationFormatter(cell) {

@@ -1,18 +1,21 @@
 :root {
   color-scheme: light;
-  --bg: #eef3f4;
-  --bg-accent: #d8ece8;
-  --surface: rgba(255, 255, 255, 0.94);
+  --bg: #f0f8f4; /* ekologiczny zielony background */
+  --bg-accent: #e8f5f0; /* jaśniejszy ekologiczny zielony */
+  --surface: rgba(255, 255, 255, 0.96);
   --surface-strong: #ffffff;
-  --surface-muted: #f2f7f8;
-  --line: #d6e1e4;
-  --line-strong: #b8c8cd;
-  --text: #123036;
-  --muted: #5a7278;
-  --accent: #007f73;
-  --accent-strong: #005e56;
-  --accent-soft: #d7f2ed;
-  --danger: #b23b2a;
+  --surface-muted: #f5faf7; /* zielonkawy muted */
+  --line: #d4e8dd; /* ekologiczna zielona linia */
+  --line-strong: #b8d4c1; /* ciemniejsza ekologiczna linia */
+  --text: #0f3d2a; /* ciemniejszy ekologiczny tekst */
+  --muted: #4a6b5a; /* ekologiczny muted */
+  --accent: #059669; /* żywy ekologiczny zielony */
+  --accent-strong: #047857; /* ciemniejszy ekologiczny zielony */
+  --accent-soft: #d1fae5; /* jasny ekologiczny zielony */
+  --eco-green: #16a34a; /* dodatkowy ekologiczny zielony */
+  --eco-light: #dcfce7; /* bardzo jasny ekologiczny */
+  --nature-brown: #92400e; /* brąz natury */
+  --danger: #dc2626; /* czerwony dla błędów, ale mniej agresywny */
   --shadow: 0 18px 46px rgba(12, 37, 43, 0.12);
   --radius-xl: 28px;
   --radius-lg: 20px;
@@ -34,9 +37,10 @@ body {
   font-family: "Aptos", "Segoe UI", system-ui, sans-serif;
   color: var(--text);
   background:
-    radial-gradient(circle at top left, rgba(0, 127, 115, 0.12), transparent 24%),
-    radial-gradient(circle at top right, rgba(0, 72, 96, 0.08), transparent 18%),
-    linear-gradient(180deg, #f8fbfb 0%, var(--bg) 100%);
+    radial-gradient(circle at top left, rgba(5, 150, 105, 0.08), transparent 30%),
+    radial-gradient(circle at top right, rgba(22, 163, 74, 0.06), transparent 25%),
+    radial-gradient(circle at bottom center, rgba(220, 252, 231, 0.15), transparent 40%),
+    linear-gradient(180deg, #f8fdf9 0%, var(--bg) 100%);
 }
 
 body.has-overlay {
@@ -142,14 +146,28 @@ button {
   padding: 24px;
   border-radius: var(--radius-lg);
   background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0)),
-    linear-gradient(135deg, #0f3438 0%, #0b6b61 100%);
+    linear-gradient(135deg, rgba(255, 255, 255, 0.15), rgba(255, 255, 255, 0)),
+    linear-gradient(135deg, #064e3b 0%, #059669 50%, #16a34a 100%);
   color: #fff;
+  position: relative;
+  overflow: hidden;
+}
+
+.hero-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M10,50 Q25,25 50,50 T90,50' stroke='rgba(255,255,255,0.1)' stroke-width='2' fill='none'/%3E%3C/svg%3E") no-repeat center;
+  background-size: 200px 100px;
+  opacity: 0.3;
 }
 
 .hero-card .eyebrow,
 .hero-card #topCarMeta {
-  color: rgba(255, 255, 255, 0.82);
+  color: rgba(255, 255, 255, 0.9);
 }
 
 .badge-row,
@@ -175,7 +193,13 @@ button {
   border-radius: var(--radius-lg);
   background: var(--surface-muted);
   border: 1px solid var(--line);
+  border-left: 4px solid var(--accent);
 }
+
+.leader-card:nth-child(1) { border-left-color: #059669; }  /* Cena – zielony */
+.leader-card:nth-child(2) { border-left-color: #16a34a; }  /* Zasięg – jasny zielony */
+.leader-card:nth-child(3) { border-left-color: #15803d; }  /* Bateria – ciemny zielony */
+.leader-card:nth-child(4) { border-left-color: #166534; }  /* Wyposażenie – bardzo ciemny zielony */
 
 .leader-card strong {
   display: block;
@@ -411,7 +435,9 @@ button {
 }
 
 .tabulator-row.is-top-recommendation {
-  background: linear-gradient(90deg, rgba(0, 127, 115, 0.08), rgba(255, 255, 255, 0));
+  background: linear-gradient(90deg, rgba(0, 127, 115, 0.15), rgba(255, 255, 255, 0));
+  border-left: 4px solid var(--accent);
+  font-weight: 500;
 }
 
 .tabulator .tabulator-header {
@@ -444,6 +470,11 @@ button {
   margin: 2px 6px 2px 0;
   color: var(--accent-strong);
   background: var(--accent-soft);
+}
+
+.row-badge--recommended {
+  background: linear-gradient(135deg, rgba(0, 127, 115, 0.3), rgba(0, 170, 136, 0.2)) !important;
+  font-weight: 700;
 }
 
 .config-action-button {
@@ -647,6 +678,76 @@ button {
   border: 0;
 }
 
+.toast-notification {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 10000;
+  min-width: 320px;
+  max-width: 500px;
+  padding: 16px;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  animation: toastSlideIn 0.3s ease-out;
+}
+
+.toast-success {
+  background: var(--accent-soft);
+  border-left: 4px solid var(--accent);
+  color: var(--accent-strong);
+}
+
+.toast-error {
+  background: #fee;
+  border-left: 4px solid #d23b2a;
+  color: #b23b2a;
+}
+
+.toast-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.toast-icon {
+  font-size: 1.2rem;
+  flex-shrink: 0;
+}
+
+.toast-message {
+  flex: 1;
+  font-weight: 500;
+}
+
+.toast-close {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  opacity: 0.7;
+  padding: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.toast-close:hover {
+  opacity: 1;
+}
+
+@keyframes toastSlideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
 @media (min-width: 760px) {
   .page-shell {
     padding: 24px;
@@ -660,11 +761,9 @@ button {
   .header-actions {
     justify-content: flex-end;
   }
-}
 
-@media (min-width: 1040px) {
   .workspace-grid {
-    grid-template-columns: minmax(300px, 340px) minmax(0, 1fr);
+    grid-template-columns: minmax(280px, 300px) minmax(0, 1fr);
     align-items: start;
   }
 

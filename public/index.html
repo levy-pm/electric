@@ -12,23 +12,23 @@
     <div class="page-shell">
       <header class="topbar">
         <div class="brand-block">
-          <span class="eyebrow">Panel konfiguratorów EV</span>
+          <span class="eyebrow">🌱 Ekologiczny wybór</span>
           <h1>electric.motometr.pl</h1>
-          <p>Dodawaj PDF-y lub linki do konfiguratorów i porównuj elektryki w jednej, czytelnej tabeli.</p>
+          <p>Porównaj samochody elektryczne i wybierz najbardziej ekologiczny wariant dla Ciebie i planety.</p>
         </div>
 
         <div class="header-actions">
-          <button id="columnsButton" class="secondary-button" type="button">Kolumny</button>
-          <button id="uploadButton" class="primary-button" type="button">Wgraj konfigurację</button>
+          <button id="columnsButton" class="secondary-button" type="button">⚙️ Kolumny</button>
+          <button id="uploadButton" class="primary-button" type="button">📄 Dodaj konfigurację</button>
         </div>
       </header>
 
       <main class="page-content">
         <section class="summary-panel">
           <article class="hero-card">
-            <span class="eyebrow">Rekomendacja systemu</span>
+            <span class="eyebrow">♻️ Rekomendacja ekologiczna</span>
             <h2 id="topCarName">Brak danych</h2>
-            <p id="topCarMeta">Dodaj pierwszą konfigurację, aby zobaczyć najlepszą propozycję.</p>
+            <p id="topCarMeta">Dodaj pierwszą konfigurację, aby zobaczyć najbardziej ekologiczny wybór.</p>
             <div id="topCarBadges" class="badge-row"></div>
           </article>
 
@@ -39,10 +39,10 @@
           <aside class="filters-panel">
             <div class="panel-heading">
               <div>
-                <span class="eyebrow">Filtry</span>
-                <h2>Znajdź właściwą konfigurację</h2>
+                <span class="eyebrow">🌿 Filtry ekologiczne</span>
+                <h2>Znajdź idealną konfigurację</h2>
               </div>
-              <button id="clearFiltersButton" class="text-button" type="button">Wyczyść</button>
+              <button id="clearFiltersButton" class="text-button" type="button">Wyczyść wszystko</button>
             </div>
 
             <label class="field">
@@ -50,7 +50,7 @@
               <input
                 id="searchInput"
                 type="search"
-                placeholder="Marka, model, kolor, pakiet, wyposażenie..."
+                placeholder="Wpisz markę, model, kolor lub wyposażenie..."
               />
             </label>
 
@@ -92,8 +92,8 @@
           <section class="table-panel">
             <div class="panel-header">
               <div>
-                <h2>Porównanie konfiguracji</h2>
-                <p>Sortuj, ukrywaj kolumny i zmieniaj ich kolejność przeciągając nagłówki.</p>
+                <h2>Porównanie ekologiczne</h2>
+                <p>Sortuj kolumny przeciągając nagłówki. Wybierz najbardziej przyjazny dla środowiska wariant.</p>
               </div>
 
               <div id="statusMessage" class="status-message" aria-live="polite"></div>
@@ -141,7 +141,7 @@
       <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="importModalTitle">
         <div class="modal-header">
           <div>
-            <span class="eyebrow">Nowa konfiguracja</span>
+            <span class="eyebrow">🌱 Nowa konfiguracja ekologiczna</span>
             <h2 id="importModalTitle">Dodaj konfigurację</h2>
           </div>
 
@@ -161,25 +161,25 @@
 
         <div id="importFilePanel" class="modal-tab-panel is-active">
           <label class="upload-dropzone" for="modalUploadInput">
-            <span class="upload-title">Wybierz plik PDF</span>
-            <span class="upload-copy">Renault, Volkswagen, Kia i inne pliki z konfiguratora możesz dodać tutaj.</span>
-            <span class="upload-pill">PDF do 20 MB</span>
+            <span class="upload-title">📎 Przeciągnij plik PDF tutaj lub kliknij, aby wybrać</span>
+            <span class="upload-copy">Wspieramy konfiguratory Renault, Volkswagen, Kia, Honda, Ford i innych marek ekologicznych.</span>
+            <span class="upload-pill">🌍 Maksymalny rozmiar: 20 MB</span>
           </label>
           <input id="modalUploadInput" type="file" accept="application/pdf,.pdf" hidden />
-          <p id="selectedFileName" class="field-hint">Nie wybrano pliku.</p>
+          <p id="selectedFileName" class="field-hint">Nie wybrano pliku</p>
         </div>
 
         <div id="importUrlPanel" class="modal-tab-panel" hidden>
           <label class="field">
-            <span>Link do konfiguracji</span>
+            <span>Wklej link do konfiguratora</span>
             <input
               id="configurationUrlInput"
               type="url"
-              placeholder="https://www.honda.pl/SUokuD lub https://www.ford.pl/s/aT6u"
+              placeholder="np. https://www.honda.pl/konfigurator/model-x"
             />
           </label>
           <p class="field-hint">
-            Na start obsługiwane są linki Honda, Ford i bezpośrednie linki do PDF.
+            Obecnie obsługujemy linki z Honda, Ford i bezpośrednie PDF-y. Wklej adres URL ze swojego przeglądarki.
           </p>
         </div>
 
