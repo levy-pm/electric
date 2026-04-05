@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { canonicalizeEquipmentList, canonicalizeEquipmentLabel } = require('../src/equipment');
+const { canonicalizeEquipmentList, canonicalizeEquipmentLabel, slugify } = require('../src/equipment');
 
 test('canonicalizeEquipmentLabel keeps acronyms and title casing', () => {
   assert.equal(canonicalizeEquipmentLabel('wyswietlacz hud'), 'Wyswietlacz HUD');
@@ -19,4 +19,13 @@ test('canonicalizeEquipmentList splits newline and removes duplicates', () => {
     'Pompa Ciepla',
     'Adapter V2L',
   ]);
+});
+
+test('slugify trims very long equipment labels to fit database limits', () => {
+  const longLabel = `Pakiet ${'bardzo '.repeat(60)}dlugiego wyposazenia premium`;
+  const slug = slugify(longLabel);
+
+  assert.ok(slug.length <= 255);
+  assert.match(slug, /-[a-f0-9]{12}$/);
+  assert.equal(slug, slugify(longLabel));
 });

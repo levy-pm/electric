@@ -1,4 +1,4 @@
-const { randomUUID } = require('crypto');
+const { createHash, randomUUID } = require('crypto');
 
 const ACRONYMS = new Set([
   'ABS',
@@ -29,13 +29,26 @@ const LOWERCASE_WORDS = new Set([
   'ze',
 ]);
 
+const EQUIPMENT_SLUG_MAX_LENGTH = 255;
+
 function slugify(input) {
-  return String(input || '')
+  const baseSlug = String(input || '')
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '');
+
+  if (!baseSlug || baseSlug.length <= EQUIPMENT_SLUG_MAX_LENGTH) {
+    return baseSlug;
+  }
+
+  const hashSuffix = createHash('sha1').update(baseSlug).digest('hex').slice(0, 12);
+  const truncatedBase = baseSlug
+    .slice(0, EQUIPMENT_SLUG_MAX_LENGTH - hashSuffix.length - 1)
+    .replace(/-+$/g, '');
+
+  return `${truncatedBase}-${hashSuffix}`;
 }
 
 function normalizeEquipmentToken(token, index) {
