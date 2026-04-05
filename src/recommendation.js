@@ -29,7 +29,21 @@ const BADGE_BEST_EQUIPMENT = '🌿 Najbogatsze wyposażenie';
 // ---------------------------------------------------------------------------
 
 function safeNumber(value) {
-  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === 'string') {
+    const normalized = value.trim().replace(/\s+/g, '').replace(',', '.');
+    if (!normalized) {
+      return null;
+    }
+
+    const parsed = Number(normalized);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  return null;
 }
 
 /**
@@ -57,34 +71,39 @@ function computeLeaders(vehicles) {
   const withEquipment = vehicles.filter((v) => safeNumber(v.equipmentScore) !== null);
 
   return {
-    bestPrice: withPrice.length ? Math.min(...withPrice.map((v) => v.totalPricePln)) : null,
-    bestRange: withRange.length ? Math.max(...withRange.map((v) => v.rangeWltpKm)) : null,
-    bestBattery: withBattery.length ? Math.max(...withBattery.map((v) => v.batteryCapacityKwh)) : null,
-    bestPower: withPower.length ? Math.max(...withPower.map((v) => v.powerHp)) : null,
-    bestEquipment: withEquipment.length ? Math.max(...withEquipment.map((v) => v.equipmentScore)) : null,
+    bestPrice: withPrice.length ? Math.min(...withPrice.map((v) => safeNumber(v.totalPricePln))) : null,
+    bestRange: withRange.length ? Math.max(...withRange.map((v) => safeNumber(v.rangeWltpKm))) : null,
+    bestBattery: withBattery.length ? Math.max(...withBattery.map((v) => safeNumber(v.batteryCapacityKwh))) : null,
+    bestPower: withPower.length ? Math.max(...withPower.map((v) => safeNumber(v.powerHp))) : null,
+    bestEquipment: withEquipment.length ? Math.max(...withEquipment.map((v) => safeNumber(v.equipmentScore))) : null,
   };
 }
 
 function buildBadges(vehicle, leaders) {
   const badges = [];
+  const totalPrice = safeNumber(vehicle.totalPricePln);
+  const range = safeNumber(vehicle.rangeWltpKm);
+  const battery = safeNumber(vehicle.batteryCapacityKwh);
+  const power = safeNumber(vehicle.powerHp);
+  const equipment = safeNumber(vehicle.equipmentScore);
 
-  if (leaders.bestPrice !== null && vehicle.totalPricePln === leaders.bestPrice) {
+  if (leaders.bestPrice !== null && totalPrice === leaders.bestPrice) {
     badges.push(BADGE_BEST_PRICE);
   }
 
-  if (leaders.bestRange !== null && vehicle.rangeWltpKm === leaders.bestRange) {
+  if (leaders.bestRange !== null && range === leaders.bestRange) {
     badges.push(BADGE_BEST_RANGE);
   }
 
-  if (leaders.bestBattery !== null && vehicle.batteryCapacityKwh === leaders.bestBattery) {
+  if (leaders.bestBattery !== null && battery === leaders.bestBattery) {
     badges.push(BADGE_BEST_BATTERY);
   }
 
-  if (leaders.bestPower !== null && vehicle.powerHp === leaders.bestPower) {
+  if (leaders.bestPower !== null && power === leaders.bestPower) {
     badges.push(BADGE_BEST_POWER);
   }
 
-  if (leaders.bestEquipment !== null && vehicle.equipmentScore === leaders.bestEquipment) {
+  if (leaders.bestEquipment !== null && equipment === leaders.bestEquipment) {
     badges.push(BADGE_BEST_EQUIPMENT);
   }
 
@@ -113,15 +132,21 @@ function enrichVehicles(vehicles) {
 
   const enriched = vehicles.map((vehicle) => {
     const badges = buildBadges(vehicle, leaders);
+    const totalPrice = safeNumber(vehicle.totalPricePln);
+    const range = safeNumber(vehicle.rangeWltpKm);
+    const battery = safeNumber(vehicle.batteryCapacityKwh);
+    const power = safeNumber(vehicle.powerHp);
+    const equipment = safeNumber(vehicle.equipmentScore);
+    const efficiency = safeNumber(vehicle.energyConsumptionKwh100km);
 
     // Wynik = ważona suma znormalizowanych metryk (bez premii za odznaki — brak podwójnego liczenia)
     const breakdown = {
-      price: normalizeForScore(vehicle.totalPricePln, minPrice, maxPrice, true) * SCORING_WEIGHTS.price,
-      range: normalizeForScore(vehicle.rangeWltpKm, minRange, maxRange) * SCORING_WEIGHTS.range,
-      battery: normalizeForScore(vehicle.batteryCapacityKwh, minBattery, maxBattery) * SCORING_WEIGHTS.battery,
-      power: normalizeForScore(vehicle.powerHp, minPower, maxPower) * SCORING_WEIGHTS.power,
-      equipment: normalizeForScore(vehicle.equipmentScore, minEquipment, maxEquipment) * SCORING_WEIGHTS.equipment,
-      efficiency: normalizeForScore(vehicle.energyConsumptionKwh100km, minEfficiency, maxEfficiency, true) * SCORING_WEIGHTS.efficiency,
+      price: normalizeForScore(totalPrice, minPrice, maxPrice, true) * SCORING_WEIGHTS.price,
+      range: normalizeForScore(range, minRange, maxRange) * SCORING_WEIGHTS.range,
+      battery: normalizeForScore(battery, minBattery, maxBattery) * SCORING_WEIGHTS.battery,
+      power: normalizeForScore(power, minPower, maxPower) * SCORING_WEIGHTS.power,
+      equipment: normalizeForScore(equipment, minEquipment, maxEquipment) * SCORING_WEIGHTS.equipment,
+      efficiency: normalizeForScore(efficiency, minEfficiency, maxEfficiency, true) * SCORING_WEIGHTS.efficiency,
     };
 
     const recommendationScore =
@@ -145,8 +170,8 @@ function enrichVehicles(vehicles) {
       return b.recommendationScore - a.recommendationScore;
     }
     // Remis: tańszy wygrywa
-    const priceA = a.totalPricePln ?? Number.MAX_SAFE_INTEGER;
-    const priceB = b.totalPricePln ?? Number.MAX_SAFE_INTEGER;
+    const priceA = safeNumber(a.totalPricePln) ?? Number.MAX_SAFE_INTEGER;
+    const priceB = safeNumber(b.totalPricePln) ?? Number.MAX_SAFE_INTEGER;
     return priceA - priceB;
   });
 

@@ -737,13 +737,9 @@ function updateSummary(items) {
     });
   });
 
-  const getLeaderCardValue = (label, item) => {
+  const getLeaderCardValue = (_label, item) => {
     if (!item) {
       return '—';
-    }
-
-    if (label === leaderLabels.bestRange) {
-      return numberFormatter(item.rangeWltpKm, 'km');
     }
 
     return [item.brand, item.model].filter(Boolean).join(' ') || item.displayName || 'Bez nazwy';

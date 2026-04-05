@@ -31,3 +31,37 @@ test('enrichVehicles sorts the strongest candidate to the top', () => {
   assert.ok(payload.items[0].recommendationBadges.some((badge) => badge.includes('Najlepsza cena')));
   assert.ok(payload.items[0].recommendationBadges.some((badge) => badge.includes('zasi')));
 });
+
+test('enrichVehicles handles numeric strings from the database when assigning leaders', () => {
+  const payload = enrichVehicles([
+    {
+      id: 'ford',
+      brand: 'Ford',
+      model: 'Puma Gen-E',
+      totalPricePln: 165550,
+      rangeWltpKm: '404.00',
+      batteryCapacityKwh: '47.00',
+      powerHp: '168.00',
+      equipmentScore: 43,
+      energyConsumptionKwh100km: '14.50',
+    },
+    {
+      id: 'renault',
+      brand: 'Renault',
+      model: '4 E-Tech',
+      totalPricePln: 175300,
+      rangeWltpKm: '391.00',
+      batteryCapacityKwh: '42.00',
+      powerHp: '150.00',
+      equipmentScore: 22,
+      energyConsumptionKwh100km: '15.80',
+    },
+  ]);
+
+  const leader = payload.items.find((item) => item.id === 'ford');
+
+  assert.ok(leader);
+  assert.ok(leader.recommendationBadges.some((badge) => badge.includes('Najlepsza cena')));
+  assert.ok(leader.recommendationBadges.some((badge) => badge.includes('Największy zasięg')));
+  assert.ok(leader.recommendationBadges.some((badge) => badge.includes('Największa moc')));
+});
