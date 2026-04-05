@@ -678,6 +678,8 @@ function priceCellFormatter(fieldPln, fieldEur) {
 }
 
 function getColumns() {
+  const editableOverrides = getEditableColumnOverrides();
+
   // widthGrow: ile wolnego miejsca dostaje kolumna (0 = nie rośnie, 1 = rośnie normalnie, 2 = rośnie podwójnie)
   // widthShrink: czy może się kurczyć poniżej minWidth (domyślnie 1)
   return [
@@ -904,7 +906,16 @@ function getColumns() {
       editor: arrayInputEditor,
       cellEdited: makeArrayCellEdited('notes'),
     },
-  ];
+  ].map((definition) => {
+    if (!definition.field || !editableOverrides[definition.field]) {
+      return definition;
+    }
+
+    return {
+      ...definition,
+      ...editableOverrides[definition.field],
+    };
+  });
 }
 
 function renderColumnsDrawerContent() {
