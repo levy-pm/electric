@@ -1094,7 +1094,7 @@ function createTable(items) {
 
   const tableContainer = document.getElementById('tableContainer');
   if (tableContainer && !tableContainer.dataset.inlineEditBound) {
-    tableContainer.addEventListener('click', handleInlineCellClick);
+    tableContainer.addEventListener('click', handleInlineCellClick, true);
     tableContainer.dataset.inlineEditBound = 'true';
   }
 }
