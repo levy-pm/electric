@@ -9,6 +9,7 @@ const { config } = require('./config');
 const { buildEquipmentEntries } = require('./equipment');
 const { extractVehicleFromPdf } = require('./gemini');
 const { importVehicleFromUrl } = require('./url-import');
+const { enrichVehiclePrices, getEurExchangeRate } = require('./nbp');
 const { enrichVehicles } = require('./recommendation');
 const store = require('./store');
 
@@ -54,7 +55,7 @@ function createUploadMiddleware() {
   });
 }
 
-function toClientVehicle(vehicle) {
+function toClientVehicle(vehicle, rateInfo = null) {
   const equipmentEntries = buildEquipmentEntries(vehicle);
   const allEquipment = [...new Map(equipmentEntries.map((entry) => [entry.slug, entry.label])).values()];
   const equipmentSlugs = [...new Set(equipmentEntries.map((entry) => entry.slug))];
@@ -62,7 +63,7 @@ function toClientVehicle(vehicle) {
     vehicle.sourceType === 'upload' ? `/api/uploads/${vehicle.uploadId}/file` : null;
   const configurationSourceUrl = vehicle.sourceType === 'url' ? vehicle.sourceUrl : null;
 
-  return {
+  return enrichVehiclePrices({
     ...vehicle,
     additionalEquipmentCount: Array.isArray(vehicle.additionalEquipment) ? vehicle.additionalEquipment.length : 0,
     standardEquipmentCount: Array.isArray(vehicle.standardEquipment) ? vehicle.standardEquipment.length : 0,
@@ -71,15 +72,24 @@ function toClientVehicle(vehicle) {
     equipmentSlugs,
     configurationDownloadUrl,
     configurationSourceUrl,
-  };
+  }, rateInfo);
 }
 
-function createSummary(payload, equipmentFacets) {
+function createSummary(payload, equipmentFacets, rateInfo = null) {
   return {
     topRecommendation: payload.items[0] || null,
     leaders: payload.leaders,
     totalRows: payload.items.length,
     equipmentFacets,
+    exchangeRate: rateInfo
+      ? {
+          code: rateInfo.code,
+          mid: rateInfo.mid,
+          effectiveDate: rateInfo.effectiveDate,
+          tableNo: rateInfo.no,
+          stale: Boolean(rateInfo.stale),
+        }
+      : null,
     recommendationModel: {
       price: 0.4,
       range: 0.3,
@@ -143,11 +153,12 @@ async function createApp() {
   app.get('/api/cars', asyncRoute(async (_req, res) => {
     const vehicles = await store.listVehicles();
     const equipmentFacets = await store.listEquipmentFacets();
-    const ranked = enrichVehicles(vehicles.map(toClientVehicle));
+    const rateInfo = await getEurExchangeRate();
+    const ranked = enrichVehicles(vehicles.map((vehicle) => toClientVehicle(vehicle, rateInfo)));
 
     res.json({
       items: ranked.items,
-      summary: createSummary(ranked, equipmentFacets),
+      summary: createSummary(ranked, equipmentFacets, rateInfo),
     });
   }));
 
@@ -177,6 +188,7 @@ async function createApp() {
     const uploadEntry = await store.createUpload(req.file);
 
     try {
+      const rateInfo = await getEurExchangeRate();
       const extraction = await extractVehicleFromPdf(req.file.path, req.file.originalname);
       const vehicles = extraction.vehicles.map((vehicle) => ({
         ...vehicle,
@@ -188,7 +200,7 @@ async function createApp() {
       res.status(201).json({
         message: 'Plik zostal odczytany i dodany do tabeli.',
         uploadId: uploadEntry.id,
-        items: vehicles.map(toClientVehicle),
+        items: vehicles.map((vehicle) => toClientVehicle(vehicle, rateInfo)),
       });
     } catch (error) {
       await store.markUploadFailed(uploadEntry.id, error.message);
@@ -213,6 +225,7 @@ async function createApp() {
     });
 
     try {
+      const rateInfo = await getEurExchangeRate();
       const extraction = await importVehicleFromUrl(sourceUrl);
       const vehicles = extraction.vehicles.map((vehicle) => ({
         ...vehicle,
@@ -225,7 +238,7 @@ async function createApp() {
         message: 'Link zostal odczytany i dodany do tabeli.',
         uploadId: uploadEntry.id,
         parser: extraction.parser,
-        items: vehicles.map(toClientVehicle),
+        items: vehicles.map((vehicle) => toClientVehicle(vehicle, rateInfo)),
       });
     } catch (error) {
       await store.markUploadFailed(uploadEntry.id, error.message);
@@ -253,8 +266,9 @@ async function createApp() {
     }
 
     try {
+      const rateInfo = await getEurExchangeRate();
       const updated = await store.updateVehicle(id, patch);
-      res.json({ message: 'Zaktualizowano pomyślnie.', vehicle: toClientVehicle(updated) });
+      res.json({ message: 'Zaktualizowano pomyslnie.', vehicle: toClientVehicle(updated, rateInfo) });
     } catch (error) {
       if (error.code === 'NOT_FOUND') {
         res.status(404).json({ error: 'Nie znaleziono pojazdu.' });

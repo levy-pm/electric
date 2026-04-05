@@ -9,6 +9,7 @@ Lekki panel Node.js do porownywania konfiguracji aut elektrycznych z PDF-ow konf
 - zapisuje rekordy w MariaDB lub w trybie lokalnym `memory`
 - trzyma wyposazenie takze w katalogu relacyjnym `equipment_items` + `vehicle_equipment`
 - pokazuje ranking po cenie, zasiegu, baterii i wyposazeniu
+- przelicza ceny EUR/PLN po kursie NBP i pokazuje EUR pod cena w PLN
 - pozwala sortowac, filtrowac, szukac, ukrywac i przestawiac kolumny
 - ustawia `noindex` przez `meta robots` i `X-Robots-Tag`
 
@@ -34,6 +35,8 @@ DB_USER=
 DB_PASSWORD=
 GEMINI_API_KEY=
 GEMINI_MODEL=gemini-2.5-flash
+NBP_CACHE_TTL_MINUTES=720
+NBP_REQUEST_TIMEOUT_MS=8000
 MAX_FILE_SIZE_MB=20
 SYNC_BRANCH=main
 ```
@@ -94,6 +97,8 @@ npm run deploy:sync
 - `POST /api/upload` - upload jednego PDF-a pod polem `configurationPdf`
 - `GET /api/config` - podstawowa konfiguracja klienta
 - `GET /healthz` - prosty healthcheck + status ostatniego deploya
+
+`GET /api/cars` wzbogaca rekordy o kurs EUR z NBP i pola `totalPriceEur` / `basePriceEur`.
 
 ## Logika rekomendacji
 

@@ -507,11 +507,10 @@ button {
 }
 
 #tableContainer {
-  min-width: 900px;
+  width: 100%;
 }
 
 .tabulator {
-  min-width: 900px;
   border: 0 !important;
   background: transparent;
 }
@@ -1076,7 +1075,26 @@ button {
     flex: 3;
   }
 
-  .status-message {
-    text-align: right;
-  }
+.status-message {
+  text-align: right;
+}
+}
+
+.price-stack {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  width: 100%;
+}
+
+.price-primary {
+  font-weight: 700;
+  color: var(--text);
+}
+
+.price-secondary {
+  font-size: 0.82rem;
+  line-height: 1.25;
+  color: var(--muted);
 }

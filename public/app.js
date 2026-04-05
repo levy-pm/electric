@@ -63,13 +63,25 @@ function currencyFormatter(value) {
   }).format(value);
 }
 
-function numberFormatter(value, unit = '') {
+function currencyFormatterEur(value) {
+  if (value === null || value === undefined || value === '') {
+    return null;
+  }
+
+  return new Intl.NumberFormat('pl-PL', {
+    style: 'currency',
+    currency: 'EUR',
+    maximumFractionDigits: 0,
+  }).format(value);
+}
+
+function numberFormatter(value, unit = '', maximumFractionDigits = 1) {
   if (value === null || value === undefined || value === '') {
     return '—';
   }
 
   const formatted = new Intl.NumberFormat('pl-PL', {
-    maximumFractionDigits: 1,
+    maximumFractionDigits,
   }).format(value);
 
   return unit ? `${formatted} ${unit}` : formatted;
@@ -337,20 +349,54 @@ function equipActionFormatter(cell) {
   return `<button class="equip-action-btn" type="button" title="Edytuj wyposażenie">✏️ ${count} poz.</button>`;
 }
 
+function priceCellFormatter(fieldPln, fieldEur) {
+  return function formatPriceCell(cell) {
+    const rowData = cell.getRow().getData();
+    const plnLabel = currencyFormatter(rowData[fieldPln]);
+    const eurLabel = currencyFormatterEur(rowData[fieldEur]);
+    const rateInfo = state.summary && state.summary.exchangeRate ? state.summary.exchangeRate : null;
+    const tooltipParts = [];
+
+    if (rateInfo && rateInfo.mid) {
+      tooltipParts.push(rateInfo.tableNo ? `NBP ${rateInfo.tableNo}` : 'NBP');
+      tooltipParts.push(`1 EUR = ${numberFormatter(rateInfo.mid, 'PLN', 4)}`);
+      if (rateInfo.effectiveDate) {
+        tooltipParts.push(rateInfo.effectiveDate);
+      }
+    }
+
+    const tooltip = tooltipParts.length ? ` title="${escapeHtml(tooltipParts.join(' • '))}"` : '';
+    const secondaryLine = eurLabel
+      ? `<span class="price-secondary"${tooltip}>${escapeHtml(eurLabel)}</span>`
+      : '';
+
+    return `
+      <div class="price-stack">
+        <span class="price-primary">${escapeHtml(plnLabel)}</span>
+        ${secondaryLine}
+      </div>
+    `;
+  };
+}
+
 function getColumns() {
+  // widthGrow: ile wolnego miejsca dostaje kolumna (0 = nie rośnie, 1 = rośnie normalnie, 2 = rośnie podwójnie)
+  // widthShrink: czy może się kurczyć poniżej minWidth (domyślnie 1)
   return [
     {
       title: 'Rekomendacja',
       field: 'recommendationBadges',
       formatter: rowBadgeFormatter,
-      minWidth: 220,
+      minWidth: 200,
+      widthGrow: 2,
       headerSort: false,
     },
-    { title: 'Marka', field: 'brand', minWidth: 120, formatter: (cell) => clampText(cell.getValue()) },
+    { title: 'Marka', field: 'brand', minWidth: 100, widthGrow: 1, formatter: (cell) => clampText(cell.getValue()) },
     {
       title: 'Model',
       field: 'displayName',
-      minWidth: 280,
+      minWidth: 240,
+      widthGrow: 3,
       formatter: (cell) => `<span class="cell-clamp cell-editable">${cell.getValue() ? escapeHtml(String(cell.getValue())) : '—'}</span>`,
       editor: 'input',
       cellEdited: async (cell) => {
@@ -373,7 +419,8 @@ function getColumns() {
     {
       title: 'Konfiguracja',
       field: 'uploadId',
-      minWidth: 120,
+      minWidth: 100,
+      widthGrow: 0,
       headerSort: false,
       hozAlign: 'center',
       formatter: configurationFormatter,
@@ -384,7 +431,8 @@ function getColumns() {
     {
       title: 'Wyposażenie',
       field: 'standardEquipmentCount',
-      minWidth: 130,
+      minWidth: 110,
+      widthGrow: 0,
       headerSort: false,
       hozAlign: 'center',
       formatter: equipActionFormatter,
@@ -393,45 +441,51 @@ function getColumns() {
       },
     },
     {
-      title: 'Cena końcowa',
+      title: 'Cena',
       field: 'totalPricePln',
-      minWidth: 150,
+      minWidth: 140,
+      widthGrow: 1,
       hozAlign: 'right',
-      formatter: (cell) => currencyFormatter(cell.getValue()),
+      formatter: priceCellFormatter('totalPricePln', 'totalPriceEur'),
     },
     {
       title: 'Cena bazowa',
       field: 'basePricePln',
-      minWidth: 150,
+      minWidth: 140,
+      widthGrow: 1,
       hozAlign: 'right',
-      formatter: (cell) => currencyFormatter(cell.getValue()),
+      formatter: priceCellFormatter('basePricePln', 'basePriceEur'),
       visible: false,
     },
     {
       title: 'Zasięg WLTP',
       field: 'rangeWltpKm',
-      minWidth: 130,
+      minWidth: 120,
+      widthGrow: 1,
       hozAlign: 'right',
       formatter: (cell) => numberFormatter(cell.getValue(), 'km'),
     },
     {
       title: 'Bateria',
       field: 'batteryCapacityKwh',
-      minWidth: 120,
+      minWidth: 110,
+      widthGrow: 1,
       hozAlign: 'right',
       formatter: (cell) => numberFormatter(cell.getValue(), 'kWh'),
     },
     {
       title: 'Wyposażenie',
       field: 'equipmentScore',
-      minWidth: 120,
+      minWidth: 110,
+      widthGrow: 0,
       hozAlign: 'right',
       formatter: (cell) => numberFormatter(cell.getValue()),
     },
     {
       title: 'Pakiety',
       field: 'equipmentPackages',
-      minWidth: 240,
+      minWidth: 200,
+      widthGrow: 2,
       formatter: packagesFormatter,
       editor: packageEditor,
       cellEdited: async (cell) => {
@@ -448,28 +502,32 @@ function getColumns() {
     {
       title: 'Wszystkie elementy',
       field: 'allEquipment',
-      minWidth: 320,
+      minWidth: 280,
+      widthGrow: 2,
       formatter: (cell) => textArrayFormatter(cell.getValue()),
       visible: false,
     },
     {
       title: 'Opcje dodatkowe',
       field: 'additionalEquipmentCount',
-      minWidth: 150,
+      minWidth: 130,
+      widthGrow: 0,
       hozAlign: 'right',
       formatter: (cell) => numberFormatter(cell.getValue()),
     },
     {
       title: 'Moc',
       field: 'powerHp',
-      minWidth: 110,
+      minWidth: 100,
+      widthGrow: 0,
       hozAlign: 'right',
       formatter: (cell) => numberFormatter(cell.getValue(), 'KM'),
     },
     {
       title: 'Moc kW',
       field: 'powerKw',
-      minWidth: 110,
+      minWidth: 100,
+      widthGrow: 0,
       hozAlign: 'right',
       formatter: (cell) => numberFormatter(cell.getValue(), 'kW'),
       visible: false,
@@ -477,7 +535,8 @@ function getColumns() {
     {
       title: 'Moment',
       field: 'torqueNm',
-      minWidth: 120,
+      minWidth: 110,
+      widthGrow: 0,
       hozAlign: 'right',
       formatter: (cell) => numberFormatter(cell.getValue(), 'Nm'),
       visible: false,
@@ -485,35 +544,38 @@ function getColumns() {
     {
       title: 'Zużycie energii',
       field: 'energyConsumptionKwh100km',
-      minWidth: 180,
+      minWidth: 160,
+      widthGrow: 1,
       hozAlign: 'right',
       formatter: (cell) => numberFormatter(cell.getValue(), 'kWh/100 km'),
     },
-    { title: 'Model skrócony', field: 'model', minWidth: 140, visible: false, formatter: (cell) => clampText(cell.getValue()) },
-    { title: 'Wersja', field: 'versionName', minWidth: 220, visible: false, formatter: (cell) => clampText(cell.getValue()) },
-    { title: 'Kolor', field: 'exteriorColor', minWidth: 180, visible: false, formatter: (cell) => clampText(cell.getValue()) },
-    { title: 'Felgi', field: 'wheels', minWidth: 220, visible: false, formatter: (cell) => clampText(cell.getValue()) },
-    { title: 'Wnętrze', field: 'interiorTrim', minWidth: 220, visible: false, formatter: (cell) => clampText(cell.getValue()) },
+    { title: 'Model skrócony', field: 'model', minWidth: 130, widthGrow: 1, visible: false, formatter: (cell) => clampText(cell.getValue()) },
+    { title: 'Wersja', field: 'versionName', minWidth: 200, widthGrow: 2, visible: false, formatter: (cell) => clampText(cell.getValue()) },
+    { title: 'Kolor', field: 'exteriorColor', minWidth: 160, widthGrow: 1, visible: false, formatter: (cell) => clampText(cell.getValue()) },
+    { title: 'Felgi', field: 'wheels', minWidth: 200, widthGrow: 1, visible: false, formatter: (cell) => clampText(cell.getValue()) },
+    { title: 'Wnętrze', field: 'interiorTrim', minWidth: 200, widthGrow: 1, visible: false, formatter: (cell) => clampText(cell.getValue()) },
     {
       title: 'Liczba miejsc',
       field: 'seats',
-      minWidth: 120,
+      minWidth: 110,
+      widthGrow: 0,
       hozAlign: 'right',
       visible: false,
       formatter: (cell) => numberFormatter(cell.getValue()),
     },
-    { title: 'Paliwo', field: 'fuelType', minWidth: 140, visible: false, formatter: (cell) => clampText(cell.getValue()) },
-    { title: 'Homologacja', field: 'homologationStandard', minWidth: 160, visible: false, formatter: (cell) => clampText(cell.getValue()) },
+    { title: 'Paliwo', field: 'fuelType', minWidth: 130, widthGrow: 1, visible: false, formatter: (cell) => clampText(cell.getValue()) },
+    { title: 'Homologacja', field: 'homologationStandard', minWidth: 150, widthGrow: 1, visible: false, formatter: (cell) => clampText(cell.getValue()) },
     {
       title: 'CO₂',
       field: 'co2EmissionGkm',
-      minWidth: 100,
+      minWidth: 90,
+      widthGrow: 0,
       hozAlign: 'right',
       visible: false,
       formatter: (cell) => numberFormatter(cell.getValue(), 'g/km'),
     },
-    { title: 'Kod konfiguracji', field: 'configurationCode', minWidth: 170, visible: false, formatter: (cell) => clampText(cell.getValue()) },
-    { title: 'Data konfiguracji', field: 'sourceDate', minWidth: 160, visible: false, formatter: (cell) => clampText(cell.getValue()) },
+    { title: 'Kod konfiguracji', field: 'configurationCode', minWidth: 160, widthGrow: 1, visible: false, formatter: (cell) => clampText(cell.getValue()) },
+    { title: 'Data konfiguracji', field: 'sourceDate', minWidth: 150, widthGrow: 1, visible: false, formatter: (cell) => clampText(cell.getValue()) },
     {
       title: 'Notatki',
       field: 'notes',
@@ -618,7 +680,7 @@ function createTable(items) {
 
   state.table = new Tabulator('#tableContainer', {
     data: items,
-    layout: 'fitDataStretch',
+    layout: 'fitColumns',
     movableColumns: true,
     placeholder: '<div class="empty-state">Brak konfiguracji. Dodaj pierwszy PDF albo link, aby zbudować tabelę.</div>',
     rowFormatter: topRowFormatter,
@@ -690,10 +752,11 @@ function updateSummary(items) {
         return '';
       }
 
+      const brandModel = [item.brand, item.model].filter(Boolean).join(' ') || item.displayName || 'Bez nazwy';
       return `
         <article class="leader-card">
           <span class="eyebrow">${escapeHtml(label)}</span>
-          <strong>${escapeHtml(item.displayName || 'Bez nazwy')}</strong>
+          <strong>${escapeHtml(brandModel)}</strong>
         </article>
       `;
     })

@@ -31,6 +31,9 @@ const config = {
   uploadRateLimitWindowMs: toInt(process.env.UPLOAD_RATE_LIMIT_WINDOW_MS, 15 * 60 * 1000),
   uploadRateLimitMax: toInt(process.env.UPLOAD_RATE_LIMIT_MAX, 20),
   syncBranch: process.env.SYNC_BRANCH || 'main',
+  nbpApiBaseUrl: process.env.NBP_API_BASE_URL || 'https://api.nbp.pl/api/',
+  nbpCacheTtlMs: toInt(process.env.NBP_CACHE_TTL_MINUTES, 12 * 60) * 60 * 1000,
+  nbpRequestTimeoutMs: toInt(process.env.NBP_REQUEST_TIMEOUT_MS, 8000),
 };
 
 function validateConfig(options = {}) {
