@@ -458,9 +458,52 @@ button {
 .table-scroll-shell {
   width: 100%;
   overflow-x: auto;
+  overflow-y: clip; /* clip pionowo (dla border-radius) bez blokowania scroll X */
+  border-radius: 18px 18px 0 0;
+  /* Ukryj natywny scrollbar — zastępuje go .table-hscroll */
+  scrollbar-width: none; /* Firefox */
+}
+.table-scroll-shell::-webkit-scrollbar {
+  display: none; /* Chrome / Safari */
+}
+
+/* === STICKY HORIZONTAL SCROLLBAR === */
+
+.table-hscroll {
+  position: sticky;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  overflow-x: auto;
   overflow-y: hidden;
-  border-radius: 18px;
-  overflow: hidden;
+  height: 10px;
+  border-radius: 0 0 18px 18px;
+  opacity: 0;
+  transition: opacity 0.18s ease;
+  z-index: 10;
+}
+
+.table-panel:hover .table-hscroll {
+  opacity: 1;
+}
+
+.table-hscroll-track {
+  height: 1px; /* szerokość ustawiana przez JS */
+}
+
+.table-hscroll::-webkit-scrollbar {
+  height: 10px;
+}
+.table-hscroll::-webkit-scrollbar-track {
+  background: var(--line);
+  border-radius: 0 0 18px 18px;
+}
+.table-hscroll::-webkit-scrollbar-thumb {
+  background: var(--accent);
+  border-radius: 5px;
+}
+.table-hscroll::-webkit-scrollbar-thumb:hover {
+  background: var(--accent-strong);
 }
 
 #tableContainer {
@@ -539,6 +582,19 @@ button {
 
 .tabulator .tabulator-cell {
   border-right: 1px solid var(--line) !important;
+  white-space: normal !important; /* zezwól na zawijanie tekstu */
+  word-break: break-word;
+  align-items: flex-start !important;
+}
+
+/* Zawijanie tekstu — maks. 2 linie */
+.cell-clamp {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  word-break: break-word;
+  line-height: 1.45;
 }
 
 .badge,

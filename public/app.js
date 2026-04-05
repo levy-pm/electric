@@ -69,8 +69,14 @@ function numberFormatter(value, unit = '') {
   return unit ? `${formatted} ${unit}` : formatted;
 }
 
+function clampText(value) {
+  const text = value !== null && value !== undefined && value !== '' ? String(value) : null;
+  return `<span class="cell-clamp">${text ? escapeHtml(text) : '—'}</span>`;
+}
+
 function textArrayFormatter(values) {
-  return Array.isArray(values) && values.length ? values.join(', ') : '—';
+  const text = Array.isArray(values) && values.length ? values.join(', ') : null;
+  return `<span class="cell-clamp">${text ? escapeHtml(text) : '—'}</span>`;
 }
 
 function escapeHtml(value) {
@@ -171,6 +177,7 @@ function getColumns() {
       title: 'Model',
       field: 'displayName',
       minWidth: 280,
+      formatter: (cell) => clampText(cell.getValue()),
     },
     {
       title: 'Konfiguracja',
@@ -269,12 +276,12 @@ function getColumns() {
       hozAlign: 'right',
       formatter: (cell) => numberFormatter(cell.getValue(), 'kWh/100 km'),
     },
-    { title: 'Marka', field: 'brand', minWidth: 120, visible: false },
-    { title: 'Model skrócony', field: 'model', minWidth: 140, visible: false },
-    { title: 'Wersja', field: 'versionName', minWidth: 220, visible: false },
-    { title: 'Kolor', field: 'exteriorColor', minWidth: 180, visible: false },
-    { title: 'Felgi', field: 'wheels', minWidth: 220, visible: false },
-    { title: 'Wnętrze', field: 'interiorTrim', minWidth: 220, visible: false },
+    { title: 'Marka', field: 'brand', minWidth: 120, visible: false, formatter: (cell) => clampText(cell.getValue()) },
+    { title: 'Model skrócony', field: 'model', minWidth: 140, visible: false, formatter: (cell) => clampText(cell.getValue()) },
+    { title: 'Wersja', field: 'versionName', minWidth: 220, visible: false, formatter: (cell) => clampText(cell.getValue()) },
+    { title: 'Kolor', field: 'exteriorColor', minWidth: 180, visible: false, formatter: (cell) => clampText(cell.getValue()) },
+    { title: 'Felgi', field: 'wheels', minWidth: 220, visible: false, formatter: (cell) => clampText(cell.getValue()) },
+    { title: 'Wnętrze', field: 'interiorTrim', minWidth: 220, visible: false, formatter: (cell) => clampText(cell.getValue()) },
     {
       title: 'Liczba miejsc',
       field: 'seats',
@@ -283,8 +290,8 @@ function getColumns() {
       visible: false,
       formatter: (cell) => numberFormatter(cell.getValue()),
     },
-    { title: 'Paliwo', field: 'fuelType', minWidth: 140, visible: false },
-    { title: 'Homologacja', field: 'homologationStandard', minWidth: 160, visible: false },
+    { title: 'Paliwo', field: 'fuelType', minWidth: 140, visible: false, formatter: (cell) => clampText(cell.getValue()) },
+    { title: 'Homologacja', field: 'homologationStandard', minWidth: 160, visible: false, formatter: (cell) => clampText(cell.getValue()) },
     {
       title: 'CO₂',
       field: 'co2EmissionGkm',
@@ -293,8 +300,8 @@ function getColumns() {
       visible: false,
       formatter: (cell) => numberFormatter(cell.getValue(), 'g/km'),
     },
-    { title: 'Kod konfiguracji', field: 'configurationCode', minWidth: 170, visible: false },
-    { title: 'Data konfiguracji', field: 'sourceDate', minWidth: 160, visible: false },
+    { title: 'Kod konfiguracji', field: 'configurationCode', minWidth: 170, visible: false, formatter: (cell) => clampText(cell.getValue()) },
+    { title: 'Data konfiguracji', field: 'sourceDate', minWidth: 160, visible: false, formatter: (cell) => clampText(cell.getValue()) },
     {
       title: 'Notatki',
       field: 'notes',
@@ -343,6 +350,53 @@ function renderColumnsDrawerContent() {
   });
 }
 
+function initStickyScroll() {
+  const shell = document.querySelector('.table-scroll-shell');
+  const hscroll = document.getElementById('tableHscroll');
+  const track = document.getElementById('tableHscrollTrack');
+
+  if (!shell || !hscroll || !track) {
+    return;
+  }
+
+  function syncWidth() {
+    track.style.width = shell.scrollWidth + 'px';
+    // Wyrównaj pozycję po zmianie szerokości
+    hscroll.scrollLeft = shell.scrollLeft;
+  }
+
+  let lockShell = false;
+  let lockHscroll = false;
+
+  shell.addEventListener('scroll', () => {
+    if (lockHscroll) {
+      return;
+    }
+    lockShell = true;
+    hscroll.scrollLeft = shell.scrollLeft;
+    lockShell = false;
+  });
+
+  hscroll.addEventListener('scroll', () => {
+    if (lockShell) {
+      return;
+    }
+    lockHscroll = true;
+    shell.scrollLeft = hscroll.scrollLeft;
+    lockHscroll = false;
+  });
+
+  // Obserwuj zmiany szerokości kontenera tabeli
+  const observer = new ResizeObserver(syncWidth);
+  observer.observe(shell);
+  const container = document.getElementById('tableContainer');
+  if (container) {
+    observer.observe(container);
+  }
+
+  syncWidth();
+}
+
 function createTable(items) {
   if (state.table) {
     state.table.replaceData(items);
@@ -359,7 +413,10 @@ function createTable(items) {
     columns: getColumns(),
   });
 
-  state.table.on('tableBuilt', renderColumnsDrawerContent);
+  state.table.on('tableBuilt', () => {
+    renderColumnsDrawerContent();
+    initStickyScroll();
+  });
   state.table.on('columnMoved', renderColumnsDrawerContent);
   state.table.on('columnVisibilityChanged', renderColumnsDrawerContent);
 }
