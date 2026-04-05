@@ -648,13 +648,34 @@ function triggerInlineEdit(cell) {
   });
 }
 
-function handleInlineCellClick(event, cell) {
+function getCellComponentFromElement(cellElement) {
+  if (!state.table || !cellElement) {
+    return null;
+  }
+
+  const rowElement = cellElement.closest('.tabulator-row');
+  const field = cellElement.getAttribute('tabulator-field');
+
+  if (!rowElement || !field) {
+    return null;
+  }
+
+  const row = state.table.getRows().find((candidate) => candidate.getElement() === rowElement);
+  return row ? row.getCell(field) : null;
+}
+
+function handleInlineCellClick(event) {
   const target = event && event.target instanceof Element ? event.target : null;
   if (target && target.closest('button, a, input, textarea, select, [role="button"]')) {
     return;
   }
 
-  triggerInlineEdit(cell);
+  const cellElement = target ? target.closest('.tabulator-cell') : null;
+  if (!cellElement) {
+    return;
+  }
+
+  triggerInlineEdit(getCellComponentFromElement(cellElement));
 }
 
 async function enhanceEditableColumns() {
@@ -1068,9 +1089,14 @@ function createTable(items) {
     renderColumnsDrawerContent();
     initStickyScroll();
   });
-  state.table.on('cellClick', handleInlineCellClick);
   state.table.on('columnMoved', renderColumnsDrawerContent);
   state.table.on('columnVisibilityChanged', renderColumnsDrawerContent);
+
+  const tableContainer = document.getElementById('tableContainer');
+  if (tableContainer && !tableContainer.dataset.inlineEditBound) {
+    tableContainer.addEventListener('click', handleInlineCellClick);
+    tableContainer.dataset.inlineEditBound = 'true';
+  }
 }
 
 function updateStatus(message, isError = false) {
