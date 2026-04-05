@@ -1,0 +1,7 @@
+# DO NOT REMOVE. CLOUDLINUX PASSENGER CONFIGURATION BEGIN
+PassengerAppRoot "/home/problems/domains/electric.motometr.pl/public_html"
+PassengerBaseURI "/"
+PassengerNodejs "/home/problems/nodevenv/domains/electric.motometr.pl/public_html/20/bin/node"
+PassengerAppType node
+PassengerStartupFile server.js
+# DO NOT REMOVE. CLOUDLINUX PASSENGER CONFIGURATION END
