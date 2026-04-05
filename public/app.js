@@ -614,6 +614,49 @@ function getEditableColumnOverrides() {
   };
 }
 
+function isInlineEditableCell(cell) {
+  if (!cell) {
+    return false;
+  }
+
+  const column = cell.getColumn ? cell.getColumn() : null;
+  const field = column && column.getField ? column.getField() : null;
+  if (!field) {
+    return false;
+  }
+
+  return Boolean(getEditableColumnOverrides()[field]);
+}
+
+function triggerInlineEdit(cell) {
+  if (!isInlineEditableCell(cell)) {
+    return;
+  }
+
+  const element = cell.getElement();
+  if (!element || element.classList.contains('tabulator-editing')) {
+    return;
+  }
+
+  window.requestAnimationFrame(() => {
+    const currentElement = cell.getElement();
+    if (!currentElement || currentElement.classList.contains('tabulator-editing')) {
+      return;
+    }
+
+    cell.edit();
+  });
+}
+
+function handleInlineCellClick(event, cell) {
+  const target = event && event.target instanceof Element ? event.target : null;
+  if (target && target.closest('button, a, input, textarea, select, [role="button"]')) {
+    return;
+  }
+
+  triggerInlineEdit(cell);
+}
+
 async function enhanceEditableColumns() {
   if (!state.table) {
     return;
@@ -1025,6 +1068,7 @@ function createTable(items) {
     renderColumnsDrawerContent();
     initStickyScroll();
   });
+  state.table.on('cellClick', handleInlineCellClick);
   state.table.on('columnMoved', renderColumnsDrawerContent);
   state.table.on('columnVisibilityChanged', renderColumnsDrawerContent);
 }
