@@ -196,10 +196,9 @@ button {
   border-left: 4px solid var(--accent);
 }
 
-.leader-card:nth-child(1) { border-left-color: #059669; }  /* Cena – zielony */
-.leader-card:nth-child(2) { border-left-color: #16a34a; }  /* Zasięg – jasny zielony */
-.leader-card:nth-child(3) { border-left-color: #15803d; }  /* Bateria – ciemny zielony */
-.leader-card:nth-child(4) { border-left-color: #166534; }  /* Wyposażenie – bardzo ciemny zielony */
+.leader-card:nth-child(1) { border-left-color: #059669; }  /* Cena */
+.leader-card:nth-child(2) { border-left-color: #16a34a; }  /* Zasięg */
+.leader-card:nth-child(3) { border-left-color: #15803d; }  /* Wyposażenie */
 
 .leader-card strong {
   display: block;

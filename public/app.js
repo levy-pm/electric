@@ -45,8 +45,6 @@ const equipEdit = {
 const leaderLabels = {
   bestPrice: '💰 Najlepsza cena',
   bestRange: '🔋 Największy zasięg',
-  bestBattery: '⚡ Największa bateria',
-  bestPower: '🚀 Największa moc',
   bestEquipment: '🌿 Najbogatsze wyposażenie',
 };
 
@@ -716,7 +714,7 @@ function updateSummary(items) {
   }
 
   const top = items[0];
-  topCarName.textContent = top.displayName || 'Bez nazwy';
+  topCarName.textContent = [top.brand, top.model].filter(Boolean).join(' ') || top.displayName || 'Bez nazwy';
   topCarMeta.textContent = [
     currencyFormatter(top.totalPricePln),
     numberFormatter(top.rangeWltpKm, 'km'),
@@ -741,12 +739,10 @@ function updateSummary(items) {
 
   leaderCards.innerHTML = Object.values(leaderLabels)
     .map((label) => {
-      const item = leaderByBadge[label]; // dopasowanie po identycznym stringu
-      if (!item) {
-        return '';
-      }
-
-      const brandModel = [item.brand, item.model].filter(Boolean).join(' ') || item.displayName || 'Bez nazwy';
+      const item = leaderByBadge[label];
+      const brandModel = item
+        ? ([item.brand, item.model].filter(Boolean).join(' ') || item.displayName || 'Bez nazwy')
+        : '—';
       return `
         <article class="leader-card">
           <span class="eyebrow">${escapeHtml(label)}</span>
