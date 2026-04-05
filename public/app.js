@@ -48,6 +48,30 @@ const leaderLabels = {
   bestEquipment: '🌿 Najbogatsze wyposażenie',
 };
 
+const INLINE_ARRAY_FIELDS = new Set([
+  'equipmentPackages',
+  'notes',
+]);
+
+const INLINE_NUMBER_FIELDS = new Set([
+  'totalPricePln',
+  'basePricePln',
+  'rangeWltpKm',
+  'batteryCapacityKwh',
+  'powerHp',
+  'powerKw',
+  'torqueNm',
+  'energyConsumptionKwh100km',
+  'seats',
+  'co2EmissionGkm',
+]);
+
+const INLINE_INTEGER_FIELDS = new Set([
+  'seats',
+]);
+
+let inlineCellEditor = null;
+
 function currencyFormatter(value) {
   if (value === null || value === undefined || value === '') {
     return '—';
@@ -405,6 +429,123 @@ function valuesEqual(left, right) {
   return JSON.stringify(left ?? null) === JSON.stringify(right ?? null);
 }
 
+function getInlineEditorComparableValue(field, value) {
+  if (INLINE_ARRAY_FIELDS.has(field)) {
+    return normalizeEditableArray(value);
+  }
+
+  if (INLINE_NUMBER_FIELDS.has(field)) {
+    return value === null || value === undefined || value === '' ? null : Number(value);
+  }
+
+  return String(value || '').trim() || null;
+}
+
+function formatInlineEditorValue(field, value) {
+  if (INLINE_ARRAY_FIELDS.has(field)) {
+    return normalizeEditableArray(value).join(', ');
+  }
+
+  if (INLINE_NUMBER_FIELDS.has(field)) {
+    return value === null || value === undefined || value === '' ? '' : String(value);
+  }
+
+  return value === null || value === undefined ? '' : String(value);
+}
+
+function parseInlineEditorValue(field, rawValue) {
+  if (INLINE_ARRAY_FIELDS.has(field)) {
+    return normalizeEditableArray(rawValue);
+  }
+
+  if (INLINE_NUMBER_FIELDS.has(field)) {
+    const normalized = String(rawValue || '').trim().replace(',', '.');
+    if (!normalized) {
+      return null;
+    }
+
+    const parsed = Number(normalized);
+    if (Number.isNaN(parsed)) {
+      throw new Error('Wpisz poprawną liczbę.');
+    }
+
+    if (INLINE_INTEGER_FIELDS.has(field) && !Number.isInteger(parsed)) {
+      throw new Error('Wpisz liczbę całkowitą.');
+    }
+
+    return parsed;
+  }
+
+  return String(rawValue || '').trim() || null;
+}
+
+function destroyInlineCellEditor() {
+  if (!inlineCellEditor) {
+    return;
+  }
+
+  inlineCellEditor.cleanup?.();
+  inlineCellEditor.input?.remove();
+  inlineCellEditor = null;
+}
+
+function positionInlineCellEditor(editor) {
+  if (!editor) {
+    return;
+  }
+
+  const rect = editor.cell.getElement().getBoundingClientRect();
+  editor.input.style.left = `${rect.left}px`;
+  editor.input.style.top = `${rect.top}px`;
+  editor.input.style.width = `${Math.max(rect.width, 120)}px`;
+  editor.input.style.height = `${Math.max(rect.height, 40)}px`;
+}
+
+async function saveInlineCellEditor() {
+  if (!inlineCellEditor || inlineCellEditor.saving) {
+    return;
+  }
+
+  const editor = inlineCellEditor;
+  let nextValue;
+
+  try {
+    nextValue = parseInlineEditorValue(editor.field, editor.input.value);
+  } catch (error) {
+    showNotification(error.message, true);
+    editor.input.focus({ preventScroll: true });
+    editor.input.select();
+    return;
+  }
+
+  if (valuesEqual(nextValue, editor.originalValue)) {
+    destroyInlineCellEditor();
+    return;
+  }
+
+  editor.saving = true;
+  editor.input.disabled = true;
+
+  try {
+    await saveVehiclePatch(editor.cell.getRow().getData().id, { [editor.field]: nextValue });
+    destroyInlineCellEditor();
+  } catch (error) {
+    editor.saving = false;
+    editor.input.disabled = false;
+    editor.input.focus({ preventScroll: true });
+    editor.input.select();
+    showNotification(error.message, true);
+    return;
+  }
+
+  try {
+    await loadCars();
+    showNotification('Zapisano zmiany.', false, 1800);
+  } catch (_error) {
+    showNotification('Zmiana została zapisana, ale nie udało się odświeżyć tabeli.', true, 2800);
+  }
+}
+
 async function persistEditedCell(cell, patch, successMessage = 'Zapisano zmiany.') {
   try {
     await saveVehiclePatch(cell.getRow().getData().id, patch);
@@ -633,19 +774,109 @@ function triggerInlineEdit(cell) {
     return;
   }
 
-  const element = cell.getElement();
-  if (!element || element.classList.contains('tabulator-editing')) {
+  const field = cell.getColumn().getField();
+  if (!field) {
     return;
   }
 
-  window.requestAnimationFrame(() => {
-    const currentElement = cell.getElement();
-    if (!currentElement || currentElement.classList.contains('tabulator-editing')) {
+  if (inlineCellEditor && inlineCellEditor.cell === cell) {
+    inlineCellEditor.input.focus({ preventScroll: true });
+    inlineCellEditor.input.select();
+    return;
+  }
+
+  destroyInlineCellEditor();
+
+  const input = document.createElement('input');
+  input.className = 'floating-cell-editor';
+  input.type = INLINE_NUMBER_FIELDS.has(field) ? 'number' : 'text';
+  input.autocomplete = 'off';
+  input.spellcheck = false;
+
+  if (INLINE_INTEGER_FIELDS.has(field)) {
+    input.inputMode = 'numeric';
+    input.step = '1';
+  } else if (INLINE_NUMBER_FIELDS.has(field)) {
+    input.inputMode = 'decimal';
+    input.step = 'any';
+  } else {
+    input.inputMode = 'text';
+  }
+
+  input.value = formatInlineEditorValue(field, cell.getValue());
+  input.setAttribute('aria-label', `Edytuj ${cell.getColumn().getDefinition().title || field}`);
+
+  const editor = {
+    cell,
+    field,
+    input,
+    originalValue: getInlineEditorComparableValue(field, cell.getValue()),
+    saving: false,
+    cleanup: null,
+  };
+
+  const syncPosition = () => {
+    if (inlineCellEditor !== editor) {
       return;
     }
 
-    cell.edit();
+    positionInlineCellEditor(editor);
+  };
+
+  const onWindowKeyDown = (event) => {
+    if (inlineCellEditor !== editor || editor.saving) {
+      return;
+    }
+
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      destroyInlineCellEditor();
+    }
+  };
+
+  editor.cleanup = () => {
+    window.removeEventListener('scroll', syncPosition, true);
+    window.removeEventListener('resize', syncPosition);
+    document.removeEventListener('keydown', onWindowKeyDown, true);
+  };
+
+  document.body.appendChild(input);
+  inlineCellEditor = editor;
+  syncPosition();
+
+  window.addEventListener('scroll', syncPosition, true);
+  window.addEventListener('resize', syncPosition);
+  document.addEventListener('keydown', onWindowKeyDown, true);
+
+  input.addEventListener('keydown', async (event) => {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      event.stopPropagation();
+      destroyInlineCellEditor();
+      return;
+    }
+
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      event.stopPropagation();
+      await saveInlineCellEditor();
+    }
   });
+
+  input.addEventListener('blur', () => {
+    if (inlineCellEditor === editor && !editor.saving) {
+      destroyInlineCellEditor();
+    }
+  });
+
+  window.setTimeout(() => {
+    if (inlineCellEditor !== editor) {
+      return;
+    }
+
+    input.focus({ preventScroll: true });
+    input.select();
+  }, 0);
 }
 
 function getCellComponentFromElement(cellElement) {
@@ -675,7 +906,14 @@ function handleInlineCellClick(event) {
     return;
   }
 
-  triggerInlineEdit(getCellComponentFromElement(cellElement));
+  const cell = getCellComponentFromElement(cellElement);
+  if (!isInlineEditableCell(cell)) {
+    return;
+  }
+
+  event.preventDefault();
+  event.stopPropagation();
+  triggerInlineEdit(cell);
 }
 
 async function enhanceEditableColumns() {

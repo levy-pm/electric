@@ -955,6 +955,24 @@ button {
 }
 
 /* Textarea edytor pakietów (Tabulator custom editor) */
+.floating-cell-editor {
+  position: fixed;
+  z-index: 1200;
+  margin: 0;
+  padding: 8px 10px;
+  border: 2px solid var(--accent);
+  border-radius: 10px;
+  background: var(--surface-strong);
+  color: var(--text);
+  font: inherit;
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.16);
+}
+
+.floating-cell-editor:focus {
+  outline: none;
+  border-color: var(--accent-strong);
+}
+
 .pkg-textarea-editor {
   width: 100%;
   min-height: 90px;
