@@ -737,16 +737,25 @@ function updateSummary(items) {
     });
   });
 
+  const getLeaderCardValue = (label, item) => {
+    if (!item) {
+      return '—';
+    }
+
+    if (label === leaderLabels.bestRange) {
+      return numberFormatter(item.rangeWltpKm, 'km');
+    }
+
+    return [item.brand, item.model].filter(Boolean).join(' ') || item.displayName || 'Bez nazwy';
+  };
+
   leaderCards.innerHTML = Object.values(leaderLabels)
     .map((label) => {
       const item = leaderByBadge[label];
-      const brandModel = item
-        ? ([item.brand, item.model].filter(Boolean).join(' ') || item.displayName || 'Bez nazwy')
-        : '—';
       return `
         <article class="leader-card">
           <span class="eyebrow">${escapeHtml(label)}</span>
-          <strong>${escapeHtml(brandModel)}</strong>
+          <strong>${escapeHtml(getLeaderCardValue(label, item))}</strong>
         </article>
       `;
     })
