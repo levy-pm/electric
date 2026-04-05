@@ -618,7 +618,7 @@ function createTable(items) {
 
   state.table = new Tabulator('#tableContainer', {
     data: items,
-    layout: 'fitDataTable',
+    layout: 'fitDataStretch',
     movableColumns: true,
     placeholder: '<div class="empty-state">Brak konfiguracji. Dodaj pierwszy PDF albo link, aby zbudować tabelę.</div>',
     rowFormatter: topRowFormatter,
