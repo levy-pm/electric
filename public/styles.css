@@ -386,6 +386,11 @@ button {
   box-shadow: 0 20px 42px rgba(8, 31, 37, 0.14);
 }
 
+/* display:grid nadpisuje atrybut [hidden] — wymuszamy ukrycie */
+.multi-select-dropdown[hidden] {
+  display: none !important;
+}
+
 .multi-select-search input {
   min-height: 46px;
   background: var(--surface-muted);
