@@ -1,0 +1,186 @@
+const fs = require('fs');
+const path = require('path');
+const { randomUUID } = require('crypto');
+const express = require('express');
+const multer = require('multer');
+const rateLimit = require('express-rate-limit');
+const sanitizeFilename = require('sanitize-filename');
+const { config } = require('./config');
+const { buildEquipmentEntries } = require('./equipment');
+const { extractVehicleFromPdf } = require('./gemini');
+const { enrichVehicles } = require('./recommendation');
+const store = require('./store');
+
+function ensureDirectories() {
+  fs.mkdirSync(config.uploadDir, { recursive: true });
+  fs.mkdirSync(config.logsDir, { recursive: true });
+}
+
+function createUploadMiddleware() {
+  const diskStorage = multer.diskStorage({
+    destination(_req, _file, callback) {
+      callback(null, config.uploadDir);
+    },
+    filename(_req, file, callback) {
+      const cleanName = sanitizeFilename(file.originalname || 'config.pdf');
+      const extension = path.extname(cleanName) || '.pdf';
+      callback(null, `${Date.now()}-${randomUUID()}${extension}`);
+    },
+  });
+
+  return multer({
+    storage: diskStorage,
+    limits: {
+      fileSize: config.maxFileSizeMb * 1024 * 1024,
+    },
+    fileFilter(_req, file, callback) {
+      const isPdf = file.mimetype === 'application/pdf' || /\.pdf$/i.test(file.originalname || '');
+      callback(isPdf ? null : new Error('Dozwolone sa tylko pliki PDF.'), isPdf);
+    },
+  });
+}
+
+function toClientVehicle(vehicle) {
+  const equipmentEntries = buildEquipmentEntries(vehicle);
+  const allEquipment = [...new Map(equipmentEntries.map((entry) => [entry.slug, entry.label])).values()];
+  const equipmentSlugs = [...new Set(equipmentEntries.map((entry) => entry.slug))];
+
+  return {
+    ...vehicle,
+    additionalEquipmentCount: Array.isArray(vehicle.additionalEquipment) ? vehicle.additionalEquipment.length : 0,
+    standardEquipmentCount: Array.isArray(vehicle.standardEquipment) ? vehicle.standardEquipment.length : 0,
+    equipmentPackagesCount: Array.isArray(vehicle.equipmentPackages) ? vehicle.equipmentPackages.length : 0,
+    allEquipment,
+    equipmentSlugs,
+  };
+}
+
+function createSummary(payload, equipmentFacets) {
+  return {
+    topRecommendation: payload.items[0] || null,
+    leaders: payload.leaders,
+    totalRows: payload.items.length,
+    equipmentFacets,
+    recommendationModel: {
+      price: 0.4,
+      range: 0.3,
+      battery: 0.15,
+      equipment: 0.15,
+    },
+  };
+}
+
+function asyncRoute(handler) {
+  return (req, res, next) => {
+    Promise.resolve(handler(req, res, next)).catch(next);
+  };
+}
+
+async function createApp() {
+  ensureDirectories();
+  await store.initStore();
+
+  const app = express();
+  const upload = createUploadMiddleware();
+  const uploadLimiter = rateLimit({
+    windowMs: config.uploadRateLimitWindowMs,
+    limit: config.uploadRateLimitMax,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Limit uploadow zostal chwilowo osiagniety.' },
+  });
+
+  app.disable('x-powered-by');
+  app.use(express.json({ limit: '2mb' }));
+  app.use((req, res, next) => {
+    res.setHeader('X-Robots-Tag', 'noindex, nofollow, noarchive');
+    next();
+  });
+  app.use('/vendor/tabulator', express.static(path.join(config.rootDir, 'node_modules', 'tabulator-tables', 'dist')));
+  app.use(express.static(path.join(config.rootDir, 'public')));
+
+  app.get('/robots.txt', (_req, res) => {
+    res.type('text/plain').send('User-agent: *\nDisallow: /\n');
+  });
+
+  app.get('/healthz', (_req, res) => {
+    res.json({
+      ok: true,
+      mode: config.dbMode,
+      time: new Date().toISOString(),
+    });
+  });
+
+  app.get('/api/config', (_req, res) => {
+    res.json({
+      appName: config.appName,
+      dbMode: config.dbMode,
+      maxFileSizeMb: config.maxFileSizeMb,
+      geminiModel: config.geminiModel,
+    });
+  });
+
+  app.get('/api/cars', asyncRoute(async (_req, res) => {
+    const vehicles = await store.listVehicles();
+    const equipmentFacets = await store.listEquipmentFacets();
+    const ranked = enrichVehicles(vehicles.map(toClientVehicle));
+
+    res.json({
+      items: ranked.items,
+      summary: createSummary(ranked, equipmentFacets),
+    });
+  }));
+
+  app.post('/api/upload', uploadLimiter, upload.single('configurationPdf'), asyncRoute(async (req, res) => {
+    if (!req.file) {
+      res.status(400).json({ error: 'Nie przeslano pliku PDF.' });
+      return;
+    }
+
+    const uploadEntry = await store.createUpload(req.file);
+
+    try {
+      const extraction = await extractVehicleFromPdf(req.file.path, req.file.originalname);
+      const vehicles = extraction.vehicles.map((vehicle) => ({
+        ...vehicle,
+        createdAt: new Date().toISOString(),
+      }));
+
+      await store.markUploadCompleted(uploadEntry.id, vehicles);
+
+      res.status(201).json({
+        message: 'Plik zostal odczytany i dodany do tabeli.',
+        uploadId: uploadEntry.id,
+        items: vehicles.map(toClientVehicle),
+      });
+    } catch (error) {
+      await store.markUploadFailed(uploadEntry.id, error.message);
+      throw error;
+    }
+  }));
+
+  app.use((error, _req, res, _next) => {
+    const status = error.statusCode || (String(error.message || '').includes('PDF') ? 400 : 500);
+    res.status(status).json({
+      error: error.message || 'Wystapil nieoczekiwany blad.',
+    });
+  });
+
+  return app;
+}
+
+async function startServer() {
+  const app = await createApp();
+
+  return new Promise((resolve) => {
+    const server = app.listen(config.port, () => {
+      console.log(`electric listening on http://localhost:${config.port}`);
+      resolve(server);
+    });
+  });
+}
+
+module.exports = {
+  createApp,
+  startServer,
+};

@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="pl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex,nofollow,noarchive" />
+    <title>electric.motometr.pl</title>
+    <link rel="stylesheet" href="/vendor/tabulator/css/tabulator.min.css" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="topbar">
+        <div class="brand-block">
+          <span class="eyebrow">Panel konfiguratorów EV</span>
+          <h1>electric.motometr.pl</h1>
+          <p>Wgraj PDF konfiguratora, a system sam zbuduje porównywalną tabelę modeli.</p>
+        </div>
+
+        <div class="toolbar">
+          <label class="search-box">
+            <span>Szukaj</span>
+            <input id="searchInput" type="search" placeholder="Marka, model, wyposażenie, kolor..." />
+          </label>
+
+          <button id="columnsButton" class="secondary-button" type="button">Kolumny</button>
+          <button id="uploadButton" class="primary-button" type="button">Wgraj konfigurację</button>
+          <input id="uploadInput" type="file" accept="application/pdf,.pdf" hidden />
+        </div>
+      </header>
+
+      <main class="content-grid">
+        <section class="summary-panel">
+          <article class="hero-card">
+            <span class="eyebrow">Rekomendacja systemu</span>
+            <h2 id="topCarName">Brak danych</h2>
+            <p id="topCarMeta">Dodaj pierwszy PDF konfiguratora, aby zobaczyć najlepszą propozycję.</p>
+            <div id="topCarBadges" class="badge-row"></div>
+          </article>
+
+          <div id="leaderCards" class="leader-grid"></div>
+        </section>
+
+        <section class="table-panel">
+          <div class="panel-header">
+            <div>
+              <h2>Porównanie konfiguracji</h2>
+              <p>Sortuj, filtruj, ukrywaj kolumny i zmieniaj ich kolejność przeciągając nagłówki.</p>
+            </div>
+            <div id="statusMessage" class="status-message" aria-live="polite"></div>
+          </div>
+
+          <div class="facet-toolbar">
+            <span class="facet-label">Filtr wyposażenia</span>
+            <div id="equipmentFilters" class="facet-chips"></div>
+          </div>
+
+          <div id="tableContainer"></div>
+        </section>
+      </main>
+    </div>
+
+    <aside id="columnsDrawer" class="drawer" aria-hidden="true">
+      <div class="drawer-backdrop" data-close-drawer="true"></div>
+      <div class="drawer-panel">
+        <div class="drawer-header">
+          <div>
+            <span class="eyebrow">Widok tabeli</span>
+            <h2>Kolumny</h2>
+          </div>
+          <button id="closeColumnsButton" class="icon-button" type="button" aria-label="Zamknij">×</button>
+        </div>
+
+        <p class="drawer-copy">
+          Włączaj i wyłączaj kolumny. Kolejność ustawiasz bezpośrednio w tabeli przeciągając nagłówki.
+        </p>
+
+        <div id="columnsList" class="columns-list"></div>
+      </div>
+    </aside>
+
+    <script src="/vendor/tabulator/js/tabulator.min.js"></script>
+    <script src="/app.js" defer></script>
+  </body>
+</html>

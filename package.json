@@ -1,0 +1,32 @@
+{
+  "name": "electric",
+  "version": "0.1.0",
+  "description": "Panel do analizy konfiguratorow aut elektrycznych z PDF.",
+  "main": "server.js",
+  "scripts": {
+    "dev": "node --watch server.js",
+    "start": "node server.js",
+    "check": "node -e \"require('./src/config').validateConfig({ allowMissingGemini: true }); console.log('config ok')\"",
+    "test": "node --test"
+  },
+  "keywords": [
+    "node",
+    "express",
+    "gemini",
+    "pdf",
+    "cars"
+  ],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@google/genai": "^1.48.0",
+    "express": "^5.2.1",
+    "express-rate-limit": "^8.3.2",
+    "multer": "^2.1.1",
+    "mysql2": "^3.20.0",
+    "sanitize-filename": "^1.6.4",
+    "tabulator-tables": "^6.4.0",
+    "zod": "^4.3.6"
+  }
+}
