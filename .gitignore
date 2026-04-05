@@ -6,3 +6,5 @@ storage/logs/*
 !storage/uploads/.gitkeep
 !storage/logs/.gitkeep
 npm-debug.log*
+tmp/deploy-meta.json
+tmp/deploy.lock

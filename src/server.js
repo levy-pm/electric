@@ -17,6 +17,19 @@ function ensureDirectories() {
   fs.mkdirSync(config.logsDir, { recursive: true });
 }
 
+function readDeployMeta() {
+  const filePath = path.join(config.rootDir, 'tmp', 'deploy-meta.json');
+  if (!fs.existsSync(filePath)) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+  } catch {
+    return null;
+  }
+}
+
 function createUploadMiddleware() {
   const diskStorage = multer.diskStorage({
     destination(_req, _file, callback) {
@@ -114,6 +127,7 @@ async function createApp() {
       ok: true,
       mode: config.dbMode,
       time: new Date().toISOString(),
+      deploy: readDeployMeta(),
     });
   });
 

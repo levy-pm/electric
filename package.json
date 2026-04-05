@@ -7,7 +7,10 @@
     "dev": "node --watch server.js",
     "start": "node server.js",
     "check": "node -e \"require('./src/config').validateConfig({ allowMissingGemini: true }); console.log('config ok')\"",
-    "test": "node --test"
+    "test": "node --test test/equipment.test.js test/recommendation.test.js",
+    "test:ux": "playwright test test/ux.test.js",
+    "deploy:sync": "node scripts/deploy-runner.js",
+    "deploy:status": "node scripts/deploy-runner.js --status"
   },
   "keywords": [
     "node",
@@ -18,6 +21,9 @@
   ],
   "author": "",
   "license": "ISC",
+  "engines": {
+    "node": ">=20"
+  },
   "type": "commonjs",
   "dependencies": {
     "@google/genai": "^1.48.0",

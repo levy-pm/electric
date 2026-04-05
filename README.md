@@ -51,7 +51,7 @@ Domyslnie bez bazy aplikacja startuje w trybie `memory`. Na serwerze ustaw `DB_M
 
 1. W panelu przejdz do `Bazy danych` i utworz baze np. `problems_electric`.
 2. W `Setup Node.js App` utworz aplikacje dla `electric.motometr.pl`.
-3. Jako `Application root` ustaw katalog projektu, np. `/home/problems/electric`.
+3. Jako `Application root` ustaw katalog projektu: `/home/problems/domains/electric.motometr.pl/public_html`.
 4. Jako `Startup file` ustaw `server.js`.
 5. W `.env` wpisz dane MariaDB i klucz Gemini.
 6. Zainstaluj zaleznosci:
@@ -63,17 +63,37 @@ npm install --omit=dev
 7. Dodaj cron:
 
 ```cron
-* * * * * cd /home/problems/electric && /bin/bash scripts/pull-and-build.sh >> storage/logs/deploy.log 2>&1
+* * * * * cd /home/problems/domains/electric.motometr.pl/public_html && /bin/bash scripts/pull-and-build.sh >> storage/logs/deploy.log 2>&1
 ```
 
-Skrypt robi bezpieczne `git pull --ff-only`, dogrywa zaleznosci po zmianie i dotyka `tmp/restart.txt`.
+Skrypt:
+
+- blokuje rownolegle uruchomienia deploya
+- robi `git fetch` + `git reset --hard origin/main` + `git clean -fd`, wiec sam leczy `dirty repo` na serwerze
+- dogrywa zaleznosci przez `npm ci --omit=dev`
+- restartuje Passenger przez `tmp/restart.txt`
+- zapisuje stan ostatniego deploya do `tmp/deploy-meta.json`
+
+Do recznej diagnostyki z panelu Node.js mozesz uruchomic:
+
+```bash
+npm run deploy:status
+```
+
+Na Windows skrypt szuka `Git Bash` albo zmiennej `GIT_BASH`. Na serwerze Linux dziala bez dodatkowej konfiguracji.
+
+Do jednorazowego wymuszenia synchronizacji:
+
+```bash
+npm run deploy:sync
+```
 
 ## API
 
 - `GET /api/cars` - rekordy do tabeli
 - `POST /api/upload` - upload jednego PDF-a pod polem `configurationPdf`
 - `GET /api/config` - podstawowa konfiguracja klienta
-- `GET /healthz` - prosty healthcheck
+- `GET /healthz` - prosty healthcheck + status ostatniego deploya
 
 ## Logika rekomendacji
 
