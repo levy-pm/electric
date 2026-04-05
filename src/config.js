@@ -19,6 +19,7 @@ const config = {
   dbMode: process.env.DB_MODE || (process.env.DB_NAME ? 'mariadb' : 'memory'),
   dbHost: process.env.DB_HOST || 'localhost',
   dbPort: toInt(process.env.DB_PORT, 3306),
+  dbSocketPath: process.env.DB_SOCKET_PATH || '',
   dbName: process.env.DB_NAME || '',
   dbUser: process.env.DB_USER || '',
   dbPassword: process.env.DB_PASSWORD || '',

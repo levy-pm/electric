@@ -74,8 +74,9 @@ async function initMariaDbPool() {
   }
 
   pool = mysql.createPool({
-    host: config.dbHost,
-    port: config.dbPort,
+    host: config.dbSocketPath ? undefined : config.dbHost,
+    port: config.dbSocketPath ? undefined : config.dbPort,
+    socketPath: config.dbSocketPath || undefined,
     user: config.dbUser,
     password: config.dbPassword,
     database: config.dbName,
