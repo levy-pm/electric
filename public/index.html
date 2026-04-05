@@ -193,6 +193,39 @@
       </div>
     </div>
 
+    <div id="equipmentModal" class="modal" aria-hidden="true">
+      <div class="modal-backdrop" data-close-equip-modal="true"></div>
+
+      <div class="modal-panel equip-modal-panel" role="dialog" aria-modal="true" aria-labelledby="equipmentModalTitle">
+        <div class="modal-header">
+          <div>
+            <span class="eyebrow">🌿 Edycja wyposażenia</span>
+            <h2 id="equipmentModalTitle">Wyposażenie</h2>
+          </div>
+          <button id="closeEquipmentButton" class="icon-button" type="button" aria-label="Zamknij">×</button>
+        </div>
+
+        <div class="modal-tabs equip-tabs" role="tablist" aria-label="Typ wyposażenia">
+          <button class="tab-button is-active" type="button" data-equip-tab="standard">Seryjne</button>
+          <button class="tab-button" type="button" data-equip-tab="additional">Dodatkowe</button>
+        </div>
+
+        <div id="equipmentItemsList" class="equip-items-list"></div>
+
+        <div class="equip-add-row">
+          <input id="equipmentNewItem" class="equip-new-input" type="text" placeholder="Nowa pozycja wyposażenia..." />
+          <button id="equipmentAddButton" class="secondary-button" type="button">Dodaj</button>
+        </div>
+
+        <div id="equipmentModalStatus" class="modal-status" aria-live="polite"></div>
+
+        <div class="modal-actions">
+          <button id="cancelEquipmentButton" class="secondary-button" type="button">Anuluj</button>
+          <button id="saveEquipmentButton" class="primary-button" type="button">Zapisz</button>
+        </div>
+      </div>
+    </div>
+
     <script src="/vendor/tabulator/js/tabulator.min.js"></script>
     <script src="/app.js" defer></script>
   </body>

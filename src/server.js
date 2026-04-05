@@ -233,6 +233,37 @@ async function createApp() {
     }
   }));
 
+  app.patch('/api/vehicles/:id', asyncRoute(async (req, res) => {
+    const { id } = req.params;
+    const body = req.body || {};
+    const patch = {};
+
+    if (body.displayName !== undefined) {
+      patch.displayName = String(body.displayName || '').trim() || null;
+    }
+
+    for (const field of ['equipmentPackages', 'standardEquipment', 'additionalEquipment']) {
+      if (body[field] !== undefined) {
+        if (!Array.isArray(body[field])) {
+          res.status(400).json({ error: `${field} musi być tablicą.` });
+          return;
+        }
+        patch[field] = body[field].map((s) => String(s || '').trim()).filter(Boolean);
+      }
+    }
+
+    try {
+      const updated = await store.updateVehicle(id, patch);
+      res.json({ message: 'Zaktualizowano pomyślnie.', vehicle: toClientVehicle(updated) });
+    } catch (error) {
+      if (error.code === 'NOT_FOUND') {
+        res.status(404).json({ error: 'Nie znaleziono pojazdu.' });
+      } else {
+        throw error;
+      }
+    }
+  }));
+
   app.use((error, _req, res, _next) => {
     const status = error.statusCode || (String(error.message || '').includes('PDF') ? 400 : 500);
     res.status(status).json({

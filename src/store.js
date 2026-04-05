@@ -346,6 +346,112 @@ async function markUploadFailed(uploadId, errorMessage) {
   );
 }
 
+function computeEquipmentScore(vehicle) {
+  const std = Array.isArray(vehicle.standardEquipment) ? vehicle.standardEquipment : [];
+  const add = Array.isArray(vehicle.additionalEquipment) ? vehicle.additionalEquipment : [];
+  const pkg = Array.isArray(vehicle.equipmentPackages) ? vehicle.equipmentPackages : [];
+  return std.length + add.length * 2 + pkg.length * 3;
+}
+
+async function getVehicleById(vehicleId) {
+  if (config.dbMode === 'memory') {
+    const vehicle = memoryState.vehicles.get(vehicleId) || null;
+    if (!vehicle) return null;
+    const upload = memoryState.uploads.get(vehicle.uploadId);
+    return {
+      ...vehicle,
+      sourceType: upload ? upload.sourceType : 'upload',
+      sourceUrl: upload ? upload.sourceUrl || null : null,
+    };
+  }
+
+  const db = await initMariaDbPool();
+  const [rows] = await db.execute(
+    `SELECT v.*, u.source_type, u.source_url
+     FROM vehicles v
+     JOIN uploads u ON u.id = v.upload_id
+     WHERE v.id = ? LIMIT 1`,
+    [vehicleId]
+  );
+  return rows.length ? mapVehicleRow(rows[0]) : null;
+}
+
+async function updateVehicle(vehicleId, patch) {
+  const existing = await getVehicleById(vehicleId);
+  if (!existing) {
+    const err = new Error('NOT_FOUND');
+    err.code = 'NOT_FOUND';
+    throw err;
+  }
+
+  const updated = { ...existing };
+
+  if (patch.displayName !== undefined) updated.displayName = patch.displayName;
+  if (patch.equipmentPackages !== undefined) updated.equipmentPackages = patch.equipmentPackages;
+  if (patch.standardEquipment !== undefined) updated.standardEquipment = patch.standardEquipment;
+  if (patch.additionalEquipment !== undefined) updated.additionalEquipment = patch.additionalEquipment;
+
+  updated.equipmentScore = computeEquipmentScore(updated);
+
+  if (config.dbMode === 'memory') {
+    memoryState.vehicles.set(vehicleId, updated);
+
+    const entries = buildEquipmentEntries(updated);
+    memoryState.vehicleEquipment.set(vehicleId, entries);
+    entries.forEach((entry) => {
+      if (!memoryState.equipmentItems.has(entry.slug)) {
+        memoryState.equipmentItems.set(entry.slug, { id: entry.id, slug: entry.slug, label: entry.label });
+      }
+    });
+
+    return updated;
+  }
+
+  const db = await initMariaDbPool();
+  const connection = await db.getConnection();
+
+  try {
+    await connection.beginTransaction();
+
+    const setClauses = ['equipment_score = ?'];
+    const values = [updated.equipmentScore];
+
+    if (patch.displayName !== undefined) { setClauses.push('display_name = ?'); values.push(updated.displayName); }
+    if (patch.equipmentPackages !== undefined) { setClauses.push('equipment_packages = ?'); values.push(serializeJson(updated.equipmentPackages)); }
+    if (patch.standardEquipment !== undefined) { setClauses.push('standard_equipment = ?'); values.push(serializeJson(updated.standardEquipment)); }
+    if (patch.additionalEquipment !== undefined) { setClauses.push('additional_equipment = ?'); values.push(serializeJson(updated.additionalEquipment)); }
+
+    await connection.execute(
+      `UPDATE vehicles SET ${setClauses.join(', ')} WHERE id = ?`,
+      [...values, vehicleId]
+    );
+
+    if (patch.standardEquipment !== undefined || patch.additionalEquipment !== undefined || patch.equipmentPackages !== undefined) {
+      await connection.execute(`DELETE FROM vehicle_equipment WHERE vehicle_id = ?`, [vehicleId]);
+
+      const entries = buildEquipmentEntries(updated);
+      for (const entry of entries) {
+        const itemId = await upsertEquipmentItem(connection, entry);
+        await connection.execute(
+          `INSERT INTO vehicle_equipment (vehicle_id, equipment_item_id, equipment_type, sort_order)
+           VALUES (?, ?, ?, ?)
+           ON DUPLICATE KEY UPDATE sort_order = VALUES(sort_order)`,
+          [vehicleId, itemId, entry.type, entry.sortOrder]
+        );
+      }
+    }
+
+    await connection.commit();
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+
+  return updated;
+}
+
 async function listVehicles() {
   if (config.dbMode === 'memory') {
     return [...memoryState.vehicles.values()]
@@ -459,4 +565,6 @@ module.exports = {
   listVehicles,
   listEquipmentFacets,
   getUploadById,
+  getVehicleById,
+  updateVehicle,
 };

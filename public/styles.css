@@ -884,6 +884,165 @@ button {
   opacity: 1;
 }
 
+/* === PAKIETY — wyświetlanie jeden pod drugim === */
+
+.pkg-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.pkg-line {
+  display: block;
+  padding: 2px 8px;
+  background: var(--accent-soft);
+  border-radius: 6px;
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: var(--accent-strong);
+  white-space: normal;
+  word-break: break-word;
+}
+
+/* Edytowalne komórki — subtelny hint przy hover */
+.cell-editable::after {
+  content: '✏️';
+  font-size: 0.68rem;
+  opacity: 0;
+  margin-left: 5px;
+  transition: opacity 0.15s;
+  vertical-align: middle;
+}
+.tabulator-cell:hover .cell-editable::after {
+  opacity: 0.55;
+}
+
+/* Textarea edytor pakietów (Tabulator custom editor) */
+.pkg-textarea-editor {
+  width: 100%;
+  min-height: 90px;
+  padding: 8px 12px;
+  border: 2px solid var(--accent);
+  border-radius: 10px;
+  font: inherit;
+  font-size: 0.9rem;
+  resize: vertical;
+  background: var(--surface-strong);
+  color: var(--text);
+  line-height: 1.5;
+}
+.pkg-textarea-editor:focus {
+  outline: none;
+  border-color: var(--accent-strong);
+}
+
+/* === MODAL WYPOSAŻENIA === */
+
+.equip-modal-panel {
+  width: min(100% - 24px, 680px);
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.equip-tabs {
+  margin-top: 18px;
+}
+
+.equip-items-list {
+  flex: 1;
+  overflow-y: auto;
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 120px;
+  max-height: 340px;
+  padding: 4px 2px;
+}
+
+.equip-item-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.equip-item-input {
+  flex: 1;
+  min-height: 40px;
+  padding: 0 12px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--surface-muted);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.92rem;
+  transition: border-color 0.15s;
+}
+.equip-item-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  background: var(--surface-strong);
+}
+
+.equip-delete-btn {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  font-size: 1.2rem;
+  color: var(--danger);
+  background: #fee2e2;
+  border-radius: 8px;
+}
+.equip-delete-btn:hover {
+  background: #fca5a5;
+}
+
+.equip-add-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.equip-new-input {
+  flex: 1;
+  min-height: 44px;
+  padding: 0 14px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--surface-strong);
+  color: var(--text);
+  font: inherit;
+}
+.equip-new-input:focus {
+  outline: 2px solid rgba(0, 127, 115, 0.22);
+  border-color: var(--accent);
+}
+
+/* Ikona akcji wyposażenia w tabeli */
+.equip-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 32px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  border: none;
+  transition: background 0.15s, transform 0.12s;
+}
+.equip-action-btn:hover {
+  background: var(--eco-light);
+  transform: translateY(-1px);
+}
+
 @keyframes toastSlideIn {
   from {
     transform: translateX(100%);

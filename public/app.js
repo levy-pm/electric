@@ -36,6 +36,13 @@ const state = {
   modalReturnFocus: null,
 };
 
+const equipEdit = {
+  vehicleId: null,
+  tab: 'standard',
+  standard: [],
+  additional: [],
+};
+
 // Etykiety odznak liderów — muszą być identyczne z BADGE_* w src/recommendation.js
 const leaderLabels = {
   bestPrice: '💰 Najlepsza cena',
@@ -86,6 +93,136 @@ function escapeHtml(value) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
+}
+
+async function saveVehiclePatch(vehicleId, patch) {
+  const response = await fetch(`/api/vehicles/${encodeURIComponent(vehicleId)}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(patch),
+  });
+  const payload = await response.json();
+  if (!response.ok) {
+    throw new Error(payload.error || 'Błąd podczas zapisywania.');
+  }
+  return payload;
+}
+
+// === MODAL WYPOSAŻENIA ===
+
+function openEquipmentModal(rowData) {
+  equipEdit.vehicleId = rowData.id;
+  equipEdit.tab = 'standard';
+  equipEdit.standard = [...(rowData.standardEquipment || [])];
+  equipEdit.additional = [...(rowData.additionalEquipment || [])];
+
+  document.getElementById('equipmentModalTitle').textContent = rowData.displayName || 'Wyposażenie';
+  renderEquipmentTabButtons();
+  renderEquipmentItems();
+  updateEquipmentModalStatus('');
+  document.getElementById('equipmentNewItem').value = '';
+
+  document.getElementById('equipmentModal').classList.add('is-open');
+  document.getElementById('equipmentModal').setAttribute('aria-hidden', 'false');
+  setOverlay('equipModal');
+}
+
+function closeEquipmentModal() {
+  const modal = document.getElementById('equipmentModal');
+  modal.classList.remove('is-open');
+  modal.setAttribute('aria-hidden', 'true');
+  if (state.activeOverlay === 'equipModal') {
+    setOverlay(null);
+  }
+}
+
+function updateEquipmentModalStatus(message, isError = false) {
+  const node = document.getElementById('equipmentModalStatus');
+  node.textContent = message || '';
+  node.style.color = isError ? 'var(--danger)' : '';
+}
+
+function renderEquipmentTabButtons() {
+  document.querySelectorAll('[data-equip-tab]').forEach((btn) => {
+    btn.classList.toggle('is-active', btn.getAttribute('data-equip-tab') === equipEdit.tab);
+  });
+}
+
+function collectEquipmentInputs() {
+  document.querySelectorAll('.equip-item-input').forEach((input) => {
+    const idx = Number(input.getAttribute('data-index'));
+    const val = input.value.trim();
+    if (equipEdit.tab === 'standard') {
+      equipEdit.standard[idx] = val;
+    } else {
+      equipEdit.additional[idx] = val;
+    }
+  });
+}
+
+function renderEquipmentItems() {
+  const list = document.getElementById('equipmentItemsList');
+  const items = equipEdit.tab === 'standard' ? equipEdit.standard : equipEdit.additional;
+  const label = equipEdit.tab === 'standard' ? 'seryjnego' : 'dodatkowego';
+
+  if (!items.length) {
+    list.innerHTML = `<div class="empty-state">Brak wyposażenia ${label}. Dodaj pozycje poniżej.</div>`;
+    return;
+  }
+
+  list.innerHTML = items
+    .map(
+      (item, index) => `
+      <div class="equip-item-row">
+        <input class="equip-item-input" type="text" value="${escapeHtml(item)}" data-index="${index}" aria-label="Pozycja ${index + 1}" />
+        <button class="icon-button equip-delete-btn" type="button" data-delete-index="${index}" aria-label="Usuń pozycję">×</button>
+      </div>`
+    )
+    .join('');
+}
+
+function equipmentAddItem() {
+  collectEquipmentInputs();
+  const input = document.getElementById('equipmentNewItem');
+  const value = input.value.trim();
+  if (!value) return;
+
+  if (equipEdit.tab === 'standard') {
+    equipEdit.standard.push(value);
+  } else {
+    equipEdit.additional.push(value);
+  }
+  input.value = '';
+  renderEquipmentItems();
+  // Scroll to bottom of list
+  const list = document.getElementById('equipmentItemsList');
+  list.scrollTop = list.scrollHeight;
+}
+
+async function saveEquipmentModal() {
+  collectEquipmentInputs();
+
+  // Odfiltruj puste
+  equipEdit.standard = equipEdit.standard.filter(Boolean);
+  equipEdit.additional = equipEdit.additional.filter(Boolean);
+
+  const saveBtn = document.getElementById('saveEquipmentButton');
+  saveBtn.disabled = true;
+
+  try {
+    updateEquipmentModalStatus('Zapisuję...');
+    await saveVehiclePatch(equipEdit.vehicleId, {
+      standardEquipment: equipEdit.standard,
+      additionalEquipment: equipEdit.additional,
+    });
+    showNotification('Wyposażenie zaktualizowane.');
+    await loadCars();
+    closeEquipmentModal();
+  } catch (error) {
+    updateEquipmentModalStatus(error.message, true);
+  } finally {
+    saveBtn.disabled = false;
+  }
 }
 
 function getEyeIcon() {
@@ -164,6 +301,43 @@ function configurationFormatter(cell) {
   `;
 }
 
+// Edytor textarea dla pakietów wyposażenia (wartość = tablica stringów)
+const packageEditor = function (cell, onRendered, success, cancel) {
+  const values = cell.getValue();
+  const el = document.createElement('textarea');
+  el.className = 'pkg-textarea-editor';
+  el.value = Array.isArray(values) ? values.join('\n') : String(values || '');
+  el.title = 'Jeden pakiet na linię. Ctrl+Enter = zapisz, Esc = anuluj';
+
+  function save() {
+    const newValues = el.value.split('\n').map((s) => s.trim()).filter(Boolean);
+    success(newValues);
+  }
+
+  el.addEventListener('blur', save);
+  el.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') { e.stopPropagation(); cancel(); }
+    if (e.key === 'Enter' && e.ctrlKey) { e.preventDefault(); save(); }
+  });
+
+  onRendered(() => { el.focus(); el.setSelectionRange(el.value.length, el.value.length); });
+  return el;
+};
+
+function packagesFormatter(cell) {
+  const values = cell.getValue();
+  if (!Array.isArray(values) || !values.length) {
+    return '<span class="cell-clamp cell-editable">—</span>';
+  }
+  return `<div class="pkg-lines">${values.map((v) => `<div class="pkg-line">${escapeHtml(v)}</div>`).join('')}</div>`;
+}
+
+function equipActionFormatter(cell) {
+  const data = cell.getRow().getData();
+  const count = (data.standardEquipment || []).length + (data.additionalEquipment || []).length;
+  return `<button class="equip-action-btn" type="button" title="Edytuj wyposażenie">✏️ ${count} poz.</button>`;
+}
+
 function getColumns() {
   return [
     {
@@ -177,7 +351,24 @@ function getColumns() {
       title: 'Model',
       field: 'displayName',
       minWidth: 280,
-      formatter: (cell) => clampText(cell.getValue()),
+      formatter: (cell) => `<span class="cell-clamp cell-editable">${cell.getValue() ? escapeHtml(String(cell.getValue())) : '—'}</span>`,
+      editor: 'input',
+      cellEdited: async (cell) => {
+        const rowData = cell.getRow().getData();
+        const newName = String(cell.getValue() || '').trim();
+        if (!newName) {
+          cell.restoreOldValue();
+          showNotification('Nazwa nie może być pusta.', true);
+          return;
+        }
+        try {
+          await saveVehiclePatch(rowData.id, { displayName: newName });
+          showNotification('Nazwa zaktualizowana.');
+        } catch (err) {
+          cell.restoreOldValue();
+          showNotification(err.message, true);
+        }
+      },
     },
     {
       title: 'Konfiguracja',
@@ -188,6 +379,17 @@ function getColumns() {
       formatter: configurationFormatter,
       cellClick: (_event, cell) => {
         openConfiguration(cell.getRow().getData());
+      },
+    },
+    {
+      title: 'Wyposażenie',
+      field: 'standardEquipmentCount',
+      minWidth: 130,
+      headerSort: false,
+      hozAlign: 'center',
+      formatter: equipActionFormatter,
+      cellClick: (_event, cell) => {
+        openEquipmentModal(cell.getRow().getData());
       },
     },
     {
@@ -229,8 +431,19 @@ function getColumns() {
     {
       title: 'Pakiety',
       field: 'equipmentPackages',
-      minWidth: 220,
-      formatter: (cell) => textArrayFormatter(cell.getValue()),
+      minWidth: 240,
+      formatter: packagesFormatter,
+      editor: packageEditor,
+      cellEdited: async (cell) => {
+        const rowData = cell.getRow().getData();
+        try {
+          await saveVehiclePatch(rowData.id, { equipmentPackages: cell.getValue() || [] });
+          showNotification('Pakiety zaktualizowane.');
+        } catch (err) {
+          cell.restoreOldValue();
+          showNotification(err.message, true);
+        }
+      },
     },
     {
       title: 'Wszystkie elementy',
@@ -838,6 +1051,38 @@ function bindEvents() {
     }
   });
 
+  // Modal wyposażenia
+  document.getElementById('closeEquipmentButton').addEventListener('click', closeEquipmentModal);
+  document.getElementById('cancelEquipmentButton').addEventListener('click', closeEquipmentModal);
+  document.getElementById('saveEquipmentButton').addEventListener('click', saveEquipmentModal);
+  document.getElementById('equipmentAddButton').addEventListener('click', equipmentAddItem);
+  document.getElementById('equipmentNewItem').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); equipmentAddItem(); }
+  });
+  document.querySelectorAll('[data-close-equip-modal="true"]').forEach((node) => {
+    node.addEventListener('click', closeEquipmentModal);
+  });
+  document.querySelectorAll('[data-equip-tab]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      collectEquipmentInputs();
+      equipEdit.tab = btn.getAttribute('data-equip-tab');
+      renderEquipmentTabButtons();
+      renderEquipmentItems();
+    });
+  });
+  document.getElementById('equipmentItemsList').addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-delete-index]');
+    if (!btn) return;
+    collectEquipmentInputs();
+    const idx = Number(btn.getAttribute('data-delete-index'));
+    if (equipEdit.tab === 'standard') {
+      equipEdit.standard.splice(idx, 1);
+    } else {
+      equipEdit.additional.splice(idx, 1);
+    }
+    renderEquipmentItems();
+  });
+
   document.getElementById('columnsButton').addEventListener('click', openDrawer);
   document.getElementById('closeColumnsButton').addEventListener('click', closeDrawer);
   document
@@ -882,6 +1127,11 @@ function bindEvents() {
 
     if (state.activeOverlay === 'modal') {
       closeImportModal();
+      return;
+    }
+
+    if (state.activeOverlay === 'equipModal') {
+      closeEquipmentModal();
       return;
     }
 
