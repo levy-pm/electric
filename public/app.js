@@ -16,7 +16,6 @@ const DEFAULT_HIDDEN_FIELDS = new Set([
   'sourceDate',
   'notes',
   'equipmentPackages',
-  'additionalEquipmentCount',
 ]);
 
 const state = {
@@ -391,12 +390,23 @@ function getColumns() {
       widthGrow: 2,
       headerSort: false,
     },
-    { title: 'Marka', field: 'brand', minWidth: 100, widthGrow: 1, formatter: (cell) => clampText(cell.getValue()) },
+    {
+      title: 'Marka',
+      field: 'brand',
+      minWidth: 100,
+      widthGrow: 1,
+      formatter: (cell) => {
+        const raw = cell.getValue();
+        if (!raw) return '<span class="cell-clamp">—</span>';
+        const capitalized = String(raw).split(' ').map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+        return `<span class="cell-clamp">${escapeHtml(capitalized)}</span>`;
+      },
+    },
     {
       title: 'Model',
       field: 'displayName',
-      minWidth: 240,
-      widthGrow: 3,
+      minWidth: 150,
+      widthGrow: 2,
       formatter: (cell) => `<span class="cell-clamp cell-editable">${cell.getValue() ? escapeHtml(String(cell.getValue())) : '—'}</span>`,
       editor: 'input',
       cellEdited: async (cell) => {
@@ -474,14 +484,6 @@ function getColumns() {
       formatter: (cell) => numberFormatter(cell.getValue(), 'kWh'),
     },
     {
-      title: 'Wyposażenie',
-      field: 'equipmentScore',
-      minWidth: 110,
-      widthGrow: 0,
-      hozAlign: 'right',
-      formatter: (cell) => numberFormatter(cell.getValue()),
-    },
-    {
       title: 'Pakiety',
       field: 'equipmentPackages',
       minWidth: 200,
@@ -506,14 +508,6 @@ function getColumns() {
       widthGrow: 2,
       formatter: (cell) => textArrayFormatter(cell.getValue()),
       visible: false,
-    },
-    {
-      title: 'Opcje dodatkowe',
-      field: 'additionalEquipmentCount',
-      minWidth: 130,
-      widthGrow: 0,
-      hozAlign: 'right',
-      formatter: (cell) => numberFormatter(cell.getValue()),
     },
     {
       title: 'Moc',

@@ -476,11 +476,13 @@ button {
   right: 0;
   overflow-x: auto;
   overflow-y: hidden;
-  height: 10px;
+  height: 12px;
   border-radius: 0 0 18px 18px;
   opacity: 0;
   transition: opacity 0.18s ease;
   z-index: 10;
+  scrollbar-color: var(--accent) var(--eco-light);
+  scrollbar-width: thin;
 }
 
 .table-panel:hover .table-hscroll {
@@ -492,15 +494,16 @@ button {
 }
 
 .table-hscroll::-webkit-scrollbar {
-  height: 10px;
+  height: 12px;
 }
 .table-hscroll::-webkit-scrollbar-track {
-  background: var(--line);
+  background: var(--eco-light);
   border-radius: 0 0 18px 18px;
 }
 .table-hscroll::-webkit-scrollbar-thumb {
   background: var(--accent);
-  border-radius: 5px;
+  border-radius: 6px;
+  border: 2px solid var(--eco-light);
 }
 .table-hscroll::-webkit-scrollbar-thumb:hover {
   background: var(--accent-strong);
@@ -530,6 +533,14 @@ button {
 .tabulator .tabulator-col .tabulator-col-title {
   color: #fff !important;
   font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 0.78rem;
+  text-align: center;
+}
+
+.tabulator .tabulator-col-content {
+  justify-content: center;
 }
 
 .tabulator .tabulator-col.tabulator-sortable:hover {
