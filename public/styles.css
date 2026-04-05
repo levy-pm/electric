@@ -914,6 +914,10 @@ button {
 }
 
 /* Edytowalne komórki — subtelny hint przy hover */
+.cell-editable {
+  cursor: text;
+}
+
 .cell-editable::after {
   content: '✏️';
   font-size: 0.68rem;
@@ -924,6 +928,30 @@ button {
 }
 .tabulator-cell:hover .cell-editable::after {
   opacity: 0.55;
+}
+
+.tabulator-cell.tabulator-editing {
+  padding: 4px;
+  background: #fff;
+  box-shadow: inset 0 0 0 2px rgba(4, 120, 87, 0.18);
+}
+
+.tabulator-cell.tabulator-editing input,
+.cell-inline-editor {
+  width: 100%;
+  min-height: 38px;
+  padding: 8px 10px;
+  border: 2px solid var(--accent);
+  border-radius: 10px;
+  background: var(--surface-strong);
+  color: var(--text);
+  font: inherit;
+}
+
+.tabulator-cell.tabulator-editing input:focus,
+.cell-inline-editor:focus {
+  outline: none;
+  border-color: var(--accent-strong);
 }
 
 /* Textarea edytor pakietów (Tabulator custom editor) */

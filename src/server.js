@@ -105,6 +105,88 @@ function asyncRoute(handler) {
   };
 }
 
+const PATCH_TEXT_FIELDS = [
+  'brand',
+  'model',
+  'versionName',
+  'displayName',
+  'currency',
+  'fuelType',
+  'homologationStandard',
+  'technicalType',
+  'exteriorColor',
+  'wheels',
+  'interiorTrim',
+  'configurationCode',
+  'sourceDate',
+];
+
+const PATCH_NUMBER_FIELDS = [
+  'basePricePln',
+  'totalPricePln',
+  'powerKw',
+  'powerHp',
+  'torqueNm',
+  'rangeWltpKm',
+  'batteryCapacityKwh',
+  'energyConsumptionKwh100km',
+  'seats',
+  'co2EmissionGkm',
+  'exteriorColorPricePln',
+  'wheelsPricePln',
+  'interiorPricePln',
+];
+
+const PATCH_INTEGER_FIELDS = new Set([
+  'basePricePln',
+  'totalPricePln',
+  'seats',
+  'exteriorColorPricePln',
+  'wheelsPricePln',
+  'interiorPricePln',
+]);
+
+const PATCH_ARRAY_FIELDS = ['equipmentPackages', 'standardEquipment', 'additionalEquipment', 'notes'];
+
+function normalizeOptionalText(value) {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  const text = String(value).trim();
+  return text || null;
+}
+
+function normalizeOptionalNumber(field, value) {
+  if (value === null || value === undefined || value === '') {
+    return null;
+  }
+
+  const normalized = String(value).trim().replace(/\s+/g, '').replace(',', '.');
+  if (!normalized) {
+    return null;
+  }
+
+  const parsed = Number(normalized);
+  if (!Number.isFinite(parsed)) {
+    const error = new Error(`${field} musi być liczbą.`);
+    error.statusCode = 400;
+    throw error;
+  }
+
+  return PATCH_INTEGER_FIELDS.has(field) ? Math.round(parsed) : parsed;
+}
+
+function normalizeStringArray(field, value) {
+  if (!Array.isArray(value)) {
+    const error = new Error(`${field} musi być tablicą.`);
+    error.statusCode = 400;
+    throw error;
+  }
+
+  return value.map((item) => String(item || '').trim()).filter(Boolean);
+}
+
 async function createApp() {
   ensureDirectories();
   await store.initStore();
@@ -251,17 +333,21 @@ async function createApp() {
     const body = req.body || {};
     const patch = {};
 
-    if (body.displayName !== undefined) {
-      patch.displayName = String(body.displayName || '').trim() || null;
+    for (const field of PATCH_TEXT_FIELDS) {
+      if (body[field] !== undefined) {
+        patch[field] = normalizeOptionalText(body[field]);
+      }
     }
 
-    for (const field of ['equipmentPackages', 'standardEquipment', 'additionalEquipment']) {
+    for (const field of PATCH_NUMBER_FIELDS) {
       if (body[field] !== undefined) {
-        if (!Array.isArray(body[field])) {
-          res.status(400).json({ error: `${field} musi być tablicą.` });
-          return;
-        }
-        patch[field] = body[field].map((s) => String(s || '').trim()).filter(Boolean);
+        patch[field] = normalizeOptionalNumber(field, body[field]);
+      }
+    }
+
+    for (const field of PATCH_ARRAY_FIELDS) {
+      if (body[field] !== undefined) {
+        patch[field] = normalizeStringArray(field, body[field]);
       }
     }
 

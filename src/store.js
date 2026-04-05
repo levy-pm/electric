@@ -70,6 +70,43 @@ function mapVehicleRow(row) {
   };
 }
 
+const VEHICLE_SCALAR_COLUMNS = {
+  brand: 'brand',
+  model: 'model',
+  versionName: 'version_name',
+  displayName: 'display_name',
+  currency: 'currency',
+  basePricePln: 'base_price_pln',
+  totalPricePln: 'total_price_pln',
+  powerKw: 'power_kw',
+  powerHp: 'power_hp',
+  torqueNm: 'torque_nm',
+  rangeWltpKm: 'range_wltp_km',
+  batteryCapacityKwh: 'battery_capacity_kwh',
+  energyConsumptionKwh100km: 'energy_consumption_kwh_100km',
+  seats: 'seats',
+  fuelType: 'fuel_type',
+  homologationStandard: 'homologation_standard',
+  co2EmissionGkm: 'co2_emission_gkm',
+  technicalType: 'technical_type',
+  exteriorColor: 'exterior_color',
+  exteriorColorPricePln: 'exterior_color_price_pln',
+  wheels: 'wheels',
+  wheelsPricePln: 'wheels_price_pln',
+  interiorTrim: 'interior_trim',
+  interiorPricePln: 'interior_price_pln',
+  configurationCode: 'configuration_code',
+  sourceDate: 'source_date',
+};
+
+const VEHICLE_JSON_COLUMNS = {
+  additionalEquipment: 'additional_equipment',
+  standardEquipment: 'standard_equipment',
+  equipmentPackages: 'equipment_packages',
+  notes: 'notes',
+  warnings: 'warnings',
+};
+
 async function initMariaDbPool() {
   if (pool) {
     return pool;
@@ -391,10 +428,17 @@ async function updateVehicle(vehicleId, patch) {
 
   const updated = { ...existing };
 
-  if (patch.displayName !== undefined) updated.displayName = patch.displayName;
-  if (patch.equipmentPackages !== undefined) updated.equipmentPackages = patch.equipmentPackages;
-  if (patch.standardEquipment !== undefined) updated.standardEquipment = patch.standardEquipment;
-  if (patch.additionalEquipment !== undefined) updated.additionalEquipment = patch.additionalEquipment;
+  for (const field of Object.keys(VEHICLE_SCALAR_COLUMNS)) {
+    if (patch[field] !== undefined) {
+      updated[field] = patch[field];
+    }
+  }
+
+  for (const field of Object.keys(VEHICLE_JSON_COLUMNS)) {
+    if (patch[field] !== undefined) {
+      updated[field] = patch[field];
+    }
+  }
 
   updated.equipmentScore = computeEquipmentScore(updated);
 
@@ -421,10 +465,19 @@ async function updateVehicle(vehicleId, patch) {
     const setClauses = ['equipment_score = ?'];
     const values = [updated.equipmentScore];
 
-    if (patch.displayName !== undefined) { setClauses.push('display_name = ?'); values.push(updated.displayName); }
-    if (patch.equipmentPackages !== undefined) { setClauses.push('equipment_packages = ?'); values.push(serializeJson(updated.equipmentPackages)); }
-    if (patch.standardEquipment !== undefined) { setClauses.push('standard_equipment = ?'); values.push(serializeJson(updated.standardEquipment)); }
-    if (patch.additionalEquipment !== undefined) { setClauses.push('additional_equipment = ?'); values.push(serializeJson(updated.additionalEquipment)); }
+    for (const [field, column] of Object.entries(VEHICLE_SCALAR_COLUMNS)) {
+      if (patch[field] !== undefined) {
+        setClauses.push(`${column} = ?`);
+        values.push(updated[field]);
+      }
+    }
+
+    for (const [field, column] of Object.entries(VEHICLE_JSON_COLUMNS)) {
+      if (patch[field] !== undefined) {
+        setClauses.push(`${column} = ?`);
+        values.push(serializeJson(updated[field]));
+      }
+    }
 
     await connection.execute(
       `UPDATE vehicles SET ${setClauses.join(', ')} WHERE id = ?`,

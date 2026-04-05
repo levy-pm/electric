@@ -332,12 +332,313 @@ const packageEditor = function (cell, onRendered, success, cancel) {
   return el;
 };
 
+function editableClampFormatter(value) {
+  const text = value !== null && value !== undefined && value !== '' ? String(value) : null;
+  return `<span class="cell-clamp cell-editable">${text ? escapeHtml(text) : 'â€”'}</span>`;
+}
+
+function editableArrayFormatter(values) {
+  const text = Array.isArray(values) && values.length ? values.join(', ') : null;
+  return `<span class="cell-clamp cell-editable">${text ? escapeHtml(text) : 'â€”'}</span>`;
+}
+
+function editableNumberFormatter(value, unit = '', maximumFractionDigits = 1) {
+  return `<span class="cell-editable">${escapeHtml(numberFormatter(value, unit, maximumFractionDigits))}</span>`;
+}
+
+function normalizeEditableArray(value) {
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item || '').trim()).filter(Boolean);
+  }
+
+  return String(value || '')
+    .split(/[\n,;]+/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function getTextEditorParams(inputMode = 'text') {
+  return {
+    selectContents: true,
+    elementAttributes: {
+      autocomplete: 'off',
+      inputmode: inputMode,
+      spellcheck: 'false',
+    },
+  };
+}
+
+const arrayInputEditor = function (cell, onRendered, success, cancel) {
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'cell-inline-editor';
+  input.value = normalizeEditableArray(cell.getValue()).join(', ');
+  input.title = 'Oddziel kolejne pozycje przecinkiem. Enter = zapisz, Esc = anuluj.';
+
+  function save() {
+    success(normalizeEditableArray(input.value));
+  }
+
+  input.addEventListener('blur', save);
+  input.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') {
+      event.stopPropagation();
+      cancel();
+      return;
+    }
+
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      save();
+    }
+  });
+
+  onRendered(() => {
+    input.focus({ preventScroll: true });
+    input.select();
+  });
+
+  return input;
+};
+
+function valuesEqual(left, right) {
+  return JSON.stringify(left ?? null) === JSON.stringify(right ?? null);
+}
+
+async function persistEditedCell(cell, patch, successMessage = 'Zapisano zmiany.') {
+  try {
+    await saveVehiclePatch(cell.getRow().getData().id, patch);
+  } catch (error) {
+    cell.restoreOldValue();
+    showNotification(error.message, true);
+    return;
+  }
+
+  try {
+    await loadCars();
+    showNotification(successMessage, false, 1800);
+  } catch (_error) {
+    showNotification('Zmiana została zapisana, ale nie udało się odświeżyć tabeli.', true, 2800);
+  }
+}
+
+function makeTextCellEdited(field, successMessage = 'Zapisano zmiany.') {
+  return async (cell) => {
+    const nextValue = String(cell.getValue() || '').trim() || null;
+    const previousValue = String(cell.getOldValue() || '').trim() || null;
+
+    if (valuesEqual(nextValue, previousValue)) {
+      return;
+    }
+
+    await persistEditedCell(cell, { [field]: nextValue }, successMessage);
+  };
+}
+
+function makeNumberCellEdited(field, successMessage = 'Zapisano zmiany.') {
+  return async (cell) => {
+    const nextValue = cell.getValue() === '' ? null : cell.getValue();
+    const previousValue = cell.getOldValue() === '' ? null : cell.getOldValue();
+
+    if (valuesEqual(nextValue, previousValue)) {
+      return;
+    }
+
+    await persistEditedCell(cell, { [field]: nextValue }, successMessage);
+  };
+}
+
+function makeArrayCellEdited(field, successMessage = 'Zapisano zmiany.') {
+  return async (cell) => {
+    const nextValue = normalizeEditableArray(cell.getValue());
+    const previousValue = normalizeEditableArray(cell.getOldValue());
+
+    if (valuesEqual(nextValue, previousValue)) {
+      return;
+    }
+
+    await persistEditedCell(cell, { [field]: nextValue }, successMessage);
+  };
+}
+
+function getEditableColumnOverrides() {
+  return {
+    brand: {
+      formatter: (cell) => {
+        const raw = cell.getValue();
+        if (!raw) {
+          return editableClampFormatter(null);
+        }
+
+        const capitalized = String(raw)
+          .split(' ')
+          .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+          .join(' ');
+
+        return editableClampFormatter(capitalized);
+      },
+      editor: 'input',
+      editorParams: getTextEditorParams(),
+      cellEdited: makeTextCellEdited('brand'),
+    },
+    displayName: {
+      formatter: (cell) => editableClampFormatter(cell.getValue()),
+      editor: 'input',
+      editorParams: getTextEditorParams(),
+      cellEdited: makeTextCellEdited('displayName'),
+    },
+    totalPricePln: {
+      formatter: priceCellFormatter('totalPricePln', 'totalPriceEur'),
+      editor: 'number',
+      editorParams: getTextEditorParams('decimal'),
+      cellEdited: makeNumberCellEdited('totalPricePln'),
+    },
+    basePricePln: {
+      formatter: priceCellFormatter('basePricePln', 'basePriceEur'),
+      editor: 'number',
+      editorParams: getTextEditorParams('decimal'),
+      cellEdited: makeNumberCellEdited('basePricePln'),
+    },
+    rangeWltpKm: {
+      formatter: (cell) => editableNumberFormatter(cell.getValue(), 'km'),
+      editor: 'number',
+      editorParams: getTextEditorParams('decimal'),
+      cellEdited: makeNumberCellEdited('rangeWltpKm'),
+    },
+    batteryCapacityKwh: {
+      formatter: (cell) => editableNumberFormatter(cell.getValue(), 'kWh'),
+      editor: 'number',
+      editorParams: getTextEditorParams('decimal'),
+      cellEdited: makeNumberCellEdited('batteryCapacityKwh'),
+    },
+    equipmentPackages: {
+      formatter: packagesFormatter,
+      editor: arrayInputEditor,
+      cellEdited: makeArrayCellEdited('equipmentPackages'),
+    },
+    powerHp: {
+      formatter: (cell) => editableNumberFormatter(cell.getValue(), 'KM'),
+      editor: 'number',
+      editorParams: getTextEditorParams('decimal'),
+      cellEdited: makeNumberCellEdited('powerHp'),
+    },
+    powerKw: {
+      formatter: (cell) => editableNumberFormatter(cell.getValue(), 'kW'),
+      editor: 'number',
+      editorParams: getTextEditorParams('decimal'),
+      cellEdited: makeNumberCellEdited('powerKw'),
+    },
+    torqueNm: {
+      formatter: (cell) => editableNumberFormatter(cell.getValue(), 'Nm'),
+      editor: 'number',
+      editorParams: getTextEditorParams('decimal'),
+      cellEdited: makeNumberCellEdited('torqueNm'),
+    },
+    energyConsumptionKwh100km: {
+      formatter: (cell) => editableNumberFormatter(cell.getValue(), 'kWh/100 km'),
+      editor: 'number',
+      editorParams: getTextEditorParams('decimal'),
+      cellEdited: makeNumberCellEdited('energyConsumptionKwh100km'),
+    },
+    model: {
+      formatter: (cell) => editableClampFormatter(cell.getValue()),
+      editor: 'input',
+      editorParams: getTextEditorParams(),
+      cellEdited: makeTextCellEdited('model'),
+    },
+    versionName: {
+      formatter: (cell) => editableClampFormatter(cell.getValue()),
+      editor: 'input',
+      editorParams: getTextEditorParams(),
+      cellEdited: makeTextCellEdited('versionName'),
+    },
+    exteriorColor: {
+      formatter: (cell) => editableClampFormatter(cell.getValue()),
+      editor: 'input',
+      editorParams: getTextEditorParams(),
+      cellEdited: makeTextCellEdited('exteriorColor'),
+    },
+    wheels: {
+      formatter: (cell) => editableClampFormatter(cell.getValue()),
+      editor: 'input',
+      editorParams: getTextEditorParams(),
+      cellEdited: makeTextCellEdited('wheels'),
+    },
+    interiorTrim: {
+      formatter: (cell) => editableClampFormatter(cell.getValue()),
+      editor: 'input',
+      editorParams: getTextEditorParams(),
+      cellEdited: makeTextCellEdited('interiorTrim'),
+    },
+    seats: {
+      formatter: (cell) => editableNumberFormatter(cell.getValue()),
+      editor: 'number',
+      editorParams: getTextEditorParams('numeric'),
+      cellEdited: makeNumberCellEdited('seats'),
+    },
+    fuelType: {
+      formatter: (cell) => editableClampFormatter(cell.getValue()),
+      editor: 'input',
+      editorParams: getTextEditorParams(),
+      cellEdited: makeTextCellEdited('fuelType'),
+    },
+    homologationStandard: {
+      formatter: (cell) => editableClampFormatter(cell.getValue()),
+      editor: 'input',
+      editorParams: getTextEditorParams(),
+      cellEdited: makeTextCellEdited('homologationStandard'),
+    },
+    co2EmissionGkm: {
+      formatter: (cell) => editableNumberFormatter(cell.getValue(), 'g/km'),
+      editor: 'number',
+      editorParams: getTextEditorParams('decimal'),
+      cellEdited: makeNumberCellEdited('co2EmissionGkm'),
+    },
+    configurationCode: {
+      formatter: (cell) => editableClampFormatter(cell.getValue()),
+      editor: 'input',
+      editorParams: getTextEditorParams(),
+      cellEdited: makeTextCellEdited('configurationCode'),
+    },
+    sourceDate: {
+      formatter: (cell) => editableClampFormatter(cell.getValue()),
+      editor: 'input',
+      editorParams: getTextEditorParams(),
+      cellEdited: makeTextCellEdited('sourceDate'),
+    },
+    notes: {
+      formatter: (cell) => editableArrayFormatter(cell.getValue()),
+      editor: arrayInputEditor,
+      cellEdited: makeArrayCellEdited('notes'),
+    },
+  };
+}
+
+async function enhanceEditableColumns() {
+  if (!state.table) {
+    return;
+  }
+
+  const overrides = getEditableColumnOverrides();
+  const updates = state.table
+    .getColumns()
+    .map((column) => {
+      const field = column.getField();
+      return field && overrides[field] ? column.updateDefinition(overrides[field]) : null;
+    })
+    .filter(Boolean);
+
+  if (updates.length) {
+    await Promise.all(updates);
+  }
+}
+
 function packagesFormatter(cell) {
   const values = cell.getValue();
   if (!Array.isArray(values) || !values.length) {
     return '<span class="cell-clamp cell-editable">—</span>';
   }
-  return `<div class="pkg-lines">${values.map((v) => `<div class="pkg-line">${escapeHtml(v)}</div>`).join('')}</div>`;
+  return `<div class="pkg-lines cell-editable">${values.map((v) => `<div class="pkg-line">${escapeHtml(v)}</div>`).join('')}</div>`;
 }
 
 function equipActionFormatter(cell) {
@@ -368,7 +669,7 @@ function priceCellFormatter(fieldPln, fieldEur) {
       : '';
 
     return `
-      <div class="price-stack">
+      <div class="price-stack cell-editable">
         <span class="price-primary">${escapeHtml(plnLabel)}</span>
         ${secondaryLine}
       </div>
@@ -393,6 +694,9 @@ function getColumns() {
       field: 'brand',
       minWidth: 100,
       widthGrow: 1,
+      editor: 'input',
+      editorParams: getTextEditorParams(),
+      cellEdited: makeTextCellEdited('brand'),
       formatter: (cell) => {
         const raw = cell.getValue();
         if (!raw) return '<span class="cell-clamp">—</span>';
@@ -423,6 +727,8 @@ function getColumns() {
           showNotification(err.message, true);
         }
       },
+      editorParams: getTextEditorParams(),
+      cellEdited: makeTextCellEdited('displayName'),
     },
     {
       title: 'Konfiguracja',
@@ -454,6 +760,9 @@ function getColumns() {
       minWidth: 140,
       widthGrow: 1,
       hozAlign: 'right',
+      editor: 'number',
+      editorParams: getTextEditorParams('decimal'),
+      cellEdited: makeNumberCellEdited('totalPricePln'),
       formatter: priceCellFormatter('totalPricePln', 'totalPriceEur'),
     },
     {
@@ -462,6 +771,9 @@ function getColumns() {
       minWidth: 140,
       widthGrow: 1,
       hozAlign: 'right',
+      editor: 'number',
+      editorParams: getTextEditorParams('decimal'),
+      cellEdited: makeNumberCellEdited('basePricePln'),
       formatter: priceCellFormatter('basePricePln', 'basePriceEur'),
       visible: false,
     },
@@ -471,7 +783,10 @@ function getColumns() {
       minWidth: 120,
       widthGrow: 1,
       hozAlign: 'right',
-      formatter: (cell) => numberFormatter(cell.getValue(), 'km'),
+      editor: 'number',
+      editorParams: getTextEditorParams('decimal'),
+      cellEdited: makeNumberCellEdited('rangeWltpKm'),
+      formatter: (cell) => editableNumberFormatter(cell.getValue(), 'km'),
     },
     {
       title: 'Bateria',
@@ -479,7 +794,10 @@ function getColumns() {
       minWidth: 110,
       widthGrow: 1,
       hozAlign: 'right',
-      formatter: (cell) => numberFormatter(cell.getValue(), 'kWh'),
+      editor: 'number',
+      editorParams: getTextEditorParams('decimal'),
+      cellEdited: makeNumberCellEdited('batteryCapacityKwh'),
+      formatter: (cell) => editableNumberFormatter(cell.getValue(), 'kWh'),
     },
     {
       title: 'Pakiety',
@@ -487,17 +805,8 @@ function getColumns() {
       minWidth: 200,
       widthGrow: 2,
       formatter: packagesFormatter,
-      editor: packageEditor,
-      cellEdited: async (cell) => {
-        const rowData = cell.getRow().getData();
-        try {
-          await saveVehiclePatch(rowData.id, { equipmentPackages: cell.getValue() || [] });
-          showNotification('Pakiety zaktualizowane.');
-        } catch (err) {
-          cell.restoreOldValue();
-          showNotification(err.message, true);
-        }
-      },
+      editor: arrayInputEditor,
+      cellEdited: makeArrayCellEdited('equipmentPackages'),
     },
     {
       title: 'Wszystkie elementy',
@@ -513,7 +822,10 @@ function getColumns() {
       minWidth: 100,
       widthGrow: 0,
       hozAlign: 'right',
-      formatter: (cell) => numberFormatter(cell.getValue(), 'KM'),
+      editor: 'number',
+      editorParams: getTextEditorParams('decimal'),
+      cellEdited: makeNumberCellEdited('powerHp'),
+      formatter: (cell) => editableNumberFormatter(cell.getValue(), 'KM'),
     },
     {
       title: 'Moc kW',
@@ -521,7 +833,10 @@ function getColumns() {
       minWidth: 100,
       widthGrow: 0,
       hozAlign: 'right',
-      formatter: (cell) => numberFormatter(cell.getValue(), 'kW'),
+      editor: 'number',
+      editorParams: getTextEditorParams('decimal'),
+      cellEdited: makeNumberCellEdited('powerKw'),
+      formatter: (cell) => editableNumberFormatter(cell.getValue(), 'kW'),
       visible: false,
     },
     {
@@ -530,7 +845,10 @@ function getColumns() {
       minWidth: 110,
       widthGrow: 0,
       hozAlign: 'right',
-      formatter: (cell) => numberFormatter(cell.getValue(), 'Nm'),
+      editor: 'number',
+      editorParams: getTextEditorParams('decimal'),
+      cellEdited: makeNumberCellEdited('torqueNm'),
+      formatter: (cell) => editableNumberFormatter(cell.getValue(), 'Nm'),
       visible: false,
     },
     {
@@ -539,7 +857,10 @@ function getColumns() {
       minWidth: 160,
       widthGrow: 1,
       hozAlign: 'right',
-      formatter: (cell) => numberFormatter(cell.getValue(), 'kWh/100 km'),
+      editor: 'number',
+      editorParams: getTextEditorParams('decimal'),
+      cellEdited: makeNumberCellEdited('energyConsumptionKwh100km'),
+      formatter: (cell) => editableNumberFormatter(cell.getValue(), 'kWh/100 km'),
     },
     { title: 'Model skrócony', field: 'model', minWidth: 130, widthGrow: 1, visible: false, formatter: (cell) => clampText(cell.getValue()) },
     { title: 'Wersja', field: 'versionName', minWidth: 200, widthGrow: 2, visible: false, formatter: (cell) => clampText(cell.getValue()) },
@@ -553,7 +874,10 @@ function getColumns() {
       widthGrow: 0,
       hozAlign: 'right',
       visible: false,
-      formatter: (cell) => numberFormatter(cell.getValue()),
+      editor: 'number',
+      editorParams: getTextEditorParams('numeric'),
+      cellEdited: makeNumberCellEdited('seats'),
+      formatter: (cell) => editableNumberFormatter(cell.getValue()),
     },
     { title: 'Paliwo', field: 'fuelType', minWidth: 130, widthGrow: 1, visible: false, formatter: (cell) => clampText(cell.getValue()) },
     { title: 'Homologacja', field: 'homologationStandard', minWidth: 150, widthGrow: 1, visible: false, formatter: (cell) => clampText(cell.getValue()) },
@@ -564,7 +888,10 @@ function getColumns() {
       widthGrow: 0,
       hozAlign: 'right',
       visible: false,
-      formatter: (cell) => numberFormatter(cell.getValue(), 'g/km'),
+      editor: 'number',
+      editorParams: getTextEditorParams('decimal'),
+      cellEdited: makeNumberCellEdited('co2EmissionGkm'),
+      formatter: (cell) => editableNumberFormatter(cell.getValue(), 'g/km'),
     },
     { title: 'Kod konfiguracji', field: 'configurationCode', minWidth: 160, widthGrow: 1, visible: false, formatter: (cell) => clampText(cell.getValue()) },
     { title: 'Data konfiguracji', field: 'sourceDate', minWidth: 150, widthGrow: 1, visible: false, formatter: (cell) => clampText(cell.getValue()) },
@@ -573,7 +900,9 @@ function getColumns() {
       field: 'notes',
       minWidth: 280,
       visible: false,
-      formatter: (cell) => textArrayFormatter(cell.getValue()),
+      formatter: (cell) => editableArrayFormatter(cell.getValue()),
+      editor: arrayInputEditor,
+      cellEdited: makeArrayCellEdited('notes'),
     },
   ];
 }
@@ -673,13 +1002,15 @@ function createTable(items) {
   state.table = new Tabulator('#tableContainer', {
     data: items,
     layout: 'fitColumns',
+    editTriggerEvent: 'click',
     movableColumns: true,
     placeholder: '<div class="empty-state">Brak konfiguracji. Dodaj pierwszy PDF albo link, aby zbudować tabelę.</div>',
     rowFormatter: topRowFormatter,
     columns: getColumns(),
   });
 
-  state.table.on('tableBuilt', () => {
+  state.table.on('tableBuilt', async () => {
+    await enhanceEditableColumns();
     renderColumnsDrawerContent();
     initStickyScroll();
   });
