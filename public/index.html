@@ -35,17 +35,14 @@
           <div id="leaderCards" class="leader-grid"></div>
         </section>
 
-        <section class="workspace-grid">
-          <aside class="filters-panel">
-            <div class="panel-heading">
-              <div>
-                <span class="eyebrow">🌿 Filtry ekologiczne</span>
-                <h2>Znajdź idealną konfigurację</h2>
-              </div>
-              <button id="clearFiltersButton" class="text-button" type="button">Wyczyść wszystko</button>
-            </div>
+        <section class="filters-bar">
+          <div class="filters-bar-header">
+            <span class="eyebrow">🌿 Filtry ekologiczne</span>
+            <button id="clearFiltersButton" class="text-button" type="button">Wyczyść wszystko</button>
+          </div>
 
-            <label class="field">
+          <div class="filters-row">
+            <label class="field filters-search">
               <span>Szukaj</span>
               <input
                 id="searchInput"
@@ -54,7 +51,7 @@
               />
             </label>
 
-            <div class="field">
+            <div class="field filters-equipment">
               <div class="field-label-row">
                 <span>Wyposażenie</span>
                 <button id="clearEquipmentButton" class="text-button" type="button">Wyczyść wybór</button>
@@ -87,22 +84,22 @@
                 </div>
               </div>
             </div>
-          </aside>
+          </div>
+        </section>
 
-          <section class="table-panel">
-            <div class="panel-header">
-              <div>
-                <h2>Porównanie ekologiczne</h2>
-                <p>Sortuj kolumny przeciągając nagłówki. Wybierz najbardziej przyjazny dla środowiska wariant.</p>
-              </div>
-
-              <div id="statusMessage" class="status-message" aria-live="polite"></div>
+        <section class="table-panel">
+          <div class="panel-header">
+            <div>
+              <h2>Porównanie ekologiczne</h2>
+              <p>Sortuj kolumny przeciągając nagłówki. Wybierz najbardziej przyjazny dla środowiska wariant.</p>
             </div>
 
-            <div class="table-scroll-shell">
-              <div id="tableContainer"></div>
-            </div>
-          </section>
+            <div id="statusMessage" class="status-message" aria-live="polite"></div>
+          </div>
+
+          <div class="table-scroll-shell">
+            <div id="tableContainer"></div>
+          </div>
         </section>
       </main>
     </div>

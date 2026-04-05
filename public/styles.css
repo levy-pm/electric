@@ -206,14 +206,45 @@ button {
   margin-top: 8px;
 }
 
-.workspace-grid {
-  display: grid;
-  gap: 20px;
-}
-
-.filters-panel,
 .table-panel {
   min-width: 0;
+}
+
+/* === FILTERS BAR (poziomy, nad tabelą) === */
+
+.filters-bar {
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  padding: 20px 24px 22px;
+  border-radius: var(--radius-xl);
+}
+
+.filters-bar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.filters-bar-header .eyebrow {
+  margin-bottom: 0;
+}
+
+.filters-row {
+  display: flex;
+  gap: 14px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+.filters-search {
+  flex: 2;
+  min-width: 200px;
+}
+
+.filters-equipment {
+  flex: 2;
+  min-width: 220px;
 }
 
 .panel-heading,
@@ -237,6 +268,10 @@ button {
 
 .field + .field {
   margin-top: 18px;
+}
+
+.filters-row .field + .field {
+  margin-top: 0;
 }
 
 .field span,
@@ -419,35 +454,86 @@ button {
   width: 100%;
   overflow-x: auto;
   overflow-y: hidden;
-  border: 1px solid var(--line);
   border-radius: 18px;
-  background: var(--surface-strong);
+  overflow: hidden;
 }
 
 #tableContainer {
-  min-width: 1100px;
+  min-width: 900px;
 }
 
 .tabulator {
-  min-width: 1100px;
-  border: 0;
+  min-width: 900px;
+  border: 0 !important;
   background: transparent;
 }
 
+/* === ECO TABULATOR THEME === */
+
+.tabulator .tabulator-header {
+  background: linear-gradient(135deg, #064e3b 0%, #0a5f41 100%) !important;
+  border-bottom: 2px solid #059669 !important;
+}
+
+.tabulator .tabulator-col {
+  background: transparent !important;
+  border-right: 1px solid rgba(255, 255, 255, 0.12) !important;
+}
+
+.tabulator .tabulator-col .tabulator-col-title {
+  color: #fff !important;
+  font-weight: 700;
+}
+
+.tabulator .tabulator-col.tabulator-sortable:hover {
+  background: rgba(255, 255, 255, 0.1) !important;
+}
+
+.tabulator .tabulator-arrow {
+  border-top-color: rgba(255, 255, 255, 0.5) !important;
+  border-bottom-color: rgba(255, 255, 255, 0.5) !important;
+}
+
+.tabulator .tabulator-col[aria-sort="asc"] .tabulator-arrow,
+.tabulator .tabulator-col[aria-sort="desc"] .tabulator-arrow {
+  border-top-color: #fff !important;
+  border-bottom-color: #fff !important;
+}
+
+.tabulator-row {
+  border-bottom: 1px solid var(--line) !important;
+  transition: background 0.12s ease;
+}
+
+.tabulator-row.tabulator-row-even {
+  background-color: #f4fdf7 !important;
+}
+
+.tabulator-row.tabulator-row-odd {
+  background-color: #ffffff !important;
+}
+
+.tabulator-row:hover {
+  background-color: #dcfce7 !important;
+}
+
 .tabulator-row.is-top-recommendation {
-  background: linear-gradient(90deg, rgba(0, 127, 115, 0.15), rgba(255, 255, 255, 0));
-  border-left: 4px solid var(--accent);
+  background: linear-gradient(90deg, rgba(5, 150, 105, 0.18), rgba(240, 253, 244, 0.4)) !important;
+  border-left: 4px solid var(--accent) !important;
   font-weight: 500;
 }
 
-.tabulator .tabulator-header {
-  border-bottom: 1px solid var(--line);
-  background: #f5f9fa;
+.tabulator-row.is-top-recommendation:hover {
+  background: linear-gradient(90deg, rgba(5, 150, 105, 0.28), rgba(220, 252, 231, 0.6)) !important;
 }
 
 .tabulator .tabulator-col,
 .tabulator .tabulator-cell {
-  min-height: 56px;
+  min-height: 52px;
+}
+
+.tabulator .tabulator-cell {
+  border-right: 1px solid var(--line) !important;
 }
 
 .badge,
@@ -762,14 +848,12 @@ button {
     justify-content: flex-end;
   }
 
-  .workspace-grid {
-    grid-template-columns: minmax(280px, 300px) minmax(0, 1fr);
-    align-items: start;
+  .filters-search {
+    flex: 3;
   }
 
-  .filters-panel {
-    position: sticky;
-    top: 20px;
+  .filters-equipment {
+    flex: 3;
   }
 
   .status-message {

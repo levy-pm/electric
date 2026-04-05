@@ -1,7 +1,41 @@
+/**
+ * System rekomendacji pojazdów elektrycznych.
+ *
+ * Każdy pojazd dostaje wynik [0, 1] jako ważoną sumę znormalizowanych metryk.
+ * Normalizacja min-max gwarantuje, że żadna skala jednostek nie faworyzuje jednej cechy.
+ * Etykiety liderów muszą dokładnie odpowiadać stałej LEADER_LABELS w public/app.js.
+ */
+
+// ---------------------------------------------------------------------------
+// Wagi scoringu — suma = 1.0
+// Dostosuj do preferencji użytkowników zmieniając tylko te wartości.
+// ---------------------------------------------------------------------------
+const SCORING_WEIGHTS = {
+  price: 0.35,      // niższa cena końcowa → wyższy wynik
+  range: 0.25,      // większy zasięg WLTP → wyższy wynik
+  battery: 0.15,    // większa pojemność baterii → wyższy wynik
+  power: 0.12,      // większa moc (KM) → wyższy wynik
+  equipment: 0.08,  // więcej wyposażenia → wyższy wynik (kontrowersyjne — niska waga)
+  efficiency: 0.05, // niższe zużycie energii kWh/100 km → wyższy wynik (eko bonus)
+};
+
+// Etykiety odznak liderów — muszą być identyczne z LEADER_LABELS w public/app.js
+const BADGE_BEST_PRICE = '💰 Najlepsza cena';
+const BADGE_BEST_RANGE = '🔋 Największy zasięg';
+const BADGE_BEST_BATTERY = '⚡ Największa bateria';
+const BADGE_BEST_POWER = '🚀 Największa moc';
+const BADGE_BEST_EQUIPMENT = '🌿 Najbogatsze wyposażenie';
+
+// ---------------------------------------------------------------------------
+
 function safeNumber(value) {
   return typeof value === 'number' && Number.isFinite(value) ? value : null;
 }
 
+/**
+ * Normalizuje wartość do przedziału [0, 1].
+ * inverse=true gdy niższa wartość jest lepsza (np. cena, zużycie energii).
+ */
 function normalizeForScore(value, min, max, inverse = false) {
   if (value === null || min === null || max === null) {
     return 0;
@@ -16,24 +50,18 @@ function normalizeForScore(value, min, max, inverse = false) {
 }
 
 function computeLeaders(vehicles) {
-  const priceCandidates = vehicles.filter((vehicle) => safeNumber(vehicle.totalPricePln) !== null);
-  const rangeCandidates = vehicles.filter((vehicle) => safeNumber(vehicle.rangeWltpKm) !== null);
-  const batteryCandidates = vehicles.filter((vehicle) => safeNumber(vehicle.batteryCapacityKwh) !== null);
-  const equipmentCandidates = vehicles.filter((vehicle) => safeNumber(vehicle.equipmentScore) !== null);
+  const withPrice = vehicles.filter((v) => safeNumber(v.totalPricePln) !== null);
+  const withRange = vehicles.filter((v) => safeNumber(v.rangeWltpKm) !== null);
+  const withBattery = vehicles.filter((v) => safeNumber(v.batteryCapacityKwh) !== null);
+  const withPower = vehicles.filter((v) => safeNumber(v.powerHp) !== null);
+  const withEquipment = vehicles.filter((v) => safeNumber(v.equipmentScore) !== null);
 
   return {
-    bestPrice: priceCandidates.length
-      ? Math.min(...priceCandidates.map((vehicle) => vehicle.totalPricePln))
-      : null,
-    bestRange: rangeCandidates.length
-      ? Math.max(...rangeCandidates.map((vehicle) => vehicle.rangeWltpKm))
-      : null,
-    bestBattery: batteryCandidates.length
-      ? Math.max(...batteryCandidates.map((vehicle) => vehicle.batteryCapacityKwh))
-      : null,
-    bestEquipment: equipmentCandidates.length
-      ? Math.max(...equipmentCandidates.map((vehicle) => vehicle.equipmentScore))
-      : null,
+    bestPrice: withPrice.length ? Math.min(...withPrice.map((v) => v.totalPricePln)) : null,
+    bestRange: withRange.length ? Math.max(...withRange.map((v) => v.rangeWltpKm)) : null,
+    bestBattery: withBattery.length ? Math.max(...withBattery.map((v) => v.batteryCapacityKwh)) : null,
+    bestPower: withPower.length ? Math.max(...withPower.map((v) => v.powerHp)) : null,
+    bestEquipment: withEquipment.length ? Math.max(...withEquipment.map((v) => v.equipmentScore)) : null,
   };
 }
 
@@ -41,61 +69,68 @@ function buildBadges(vehicle, leaders) {
   const badges = [];
 
   if (leaders.bestPrice !== null && vehicle.totalPricePln === leaders.bestPrice) {
-    badges.push('Najlepsza cena');
+    badges.push(BADGE_BEST_PRICE);
   }
 
   if (leaders.bestRange !== null && vehicle.rangeWltpKm === leaders.bestRange) {
-    badges.push('Największy zasięg');
+    badges.push(BADGE_BEST_RANGE);
   }
 
   if (leaders.bestBattery !== null && vehicle.batteryCapacityKwh === leaders.bestBattery) {
-    badges.push('Największa bateria');
+    badges.push(BADGE_BEST_BATTERY);
+  }
+
+  if (leaders.bestPower !== null && vehicle.powerHp === leaders.bestPower) {
+    badges.push(BADGE_BEST_POWER);
   }
 
   if (leaders.bestEquipment !== null && vehicle.equipmentScore === leaders.bestEquipment) {
-    badges.push('Najbogatsze wyposażenie');
+    badges.push(BADGE_BEST_EQUIPMENT);
   }
 
   return badges;
 }
 
 function enrichVehicles(vehicles) {
-  const weights = {
-    price: 0.4,
-    range: 0.3,
-    battery: 0.15,
-    equipment: 0.15,
-  };
-
   const leaders = computeLeaders(vehicles);
-  const priceValues = vehicles.map((vehicle) => safeNumber(vehicle.totalPricePln)).filter((value) => value !== null);
-  const rangeValues = vehicles.map((vehicle) => safeNumber(vehicle.rangeWltpKm)).filter((value) => value !== null);
-  const batteryValues = vehicles.map((vehicle) => safeNumber(vehicle.batteryCapacityKwh)).filter((value) => value !== null);
-  const equipmentValues = vehicles.map((vehicle) => safeNumber(vehicle.equipmentScore)).filter((value) => value !== null);
 
-  const minPrice = priceValues.length ? Math.min(...priceValues) : null;
-  const maxPrice = priceValues.length ? Math.max(...priceValues) : null;
-  const minRange = rangeValues.length ? Math.min(...rangeValues) : null;
-  const maxRange = rangeValues.length ? Math.max(...rangeValues) : null;
-  const minBattery = batteryValues.length ? Math.min(...batteryValues) : null;
-  const maxBattery = batteryValues.length ? Math.max(...batteryValues) : null;
-  const minEquipment = equipmentValues.length ? Math.min(...equipmentValues) : null;
-  const maxEquipment = equipmentValues.length ? Math.max(...equipmentValues) : null;
+  // Zbierz wartości do normalizacji
+  const prices = vehicles.map((v) => safeNumber(v.totalPricePln)).filter((x) => x !== null);
+  const ranges = vehicles.map((v) => safeNumber(v.rangeWltpKm)).filter((x) => x !== null);
+  const batteries = vehicles.map((v) => safeNumber(v.batteryCapacityKwh)).filter((x) => x !== null);
+  const powers = vehicles.map((v) => safeNumber(v.powerHp)).filter((x) => x !== null);
+  const equipments = vehicles.map((v) => safeNumber(v.equipmentScore)).filter((x) => x !== null);
+  const efficiencies = vehicles.map((v) => safeNumber(v.energyConsumptionKwh100km)).filter((x) => x !== null);
+
+  const minmax = (arr) => arr.length ? [Math.min(...arr), Math.max(...arr)] : [null, null];
+
+  const [minPrice, maxPrice] = minmax(prices);
+  const [minRange, maxRange] = minmax(ranges);
+  const [minBattery, maxBattery] = minmax(batteries);
+  const [minPower, maxPower] = minmax(powers);
+  const [minEquipment, maxEquipment] = minmax(equipments);
+  const [minEfficiency, maxEfficiency] = minmax(efficiencies);
 
   const enriched = vehicles.map((vehicle) => {
     const badges = buildBadges(vehicle, leaders);
+
+    // Wynik = ważona suma znormalizowanych metryk (bez premii za odznaki — brak podwójnego liczenia)
     const breakdown = {
-      price: normalizeForScore(vehicle.totalPricePln, minPrice, maxPrice, true) * weights.price,
-      range: normalizeForScore(vehicle.rangeWltpKm, minRange, maxRange) * weights.range,
-      battery: normalizeForScore(vehicle.batteryCapacityKwh, minBattery, maxBattery) * weights.battery,
-      equipment: normalizeForScore(vehicle.equipmentScore, minEquipment, maxEquipment) * weights.equipment,
+      price: normalizeForScore(vehicle.totalPricePln, minPrice, maxPrice, true) * SCORING_WEIGHTS.price,
+      range: normalizeForScore(vehicle.rangeWltpKm, minRange, maxRange) * SCORING_WEIGHTS.range,
+      battery: normalizeForScore(vehicle.batteryCapacityKwh, minBattery, maxBattery) * SCORING_WEIGHTS.battery,
+      power: normalizeForScore(vehicle.powerHp, minPower, maxPower) * SCORING_WEIGHTS.power,
+      equipment: normalizeForScore(vehicle.equipmentScore, minEquipment, maxEquipment) * SCORING_WEIGHTS.equipment,
+      efficiency: normalizeForScore(vehicle.energyConsumptionKwh100km, minEfficiency, maxEfficiency, true) * SCORING_WEIGHTS.efficiency,
     };
+
     const recommendationScore =
       breakdown.price +
       breakdown.range +
       breakdown.battery +
+      breakdown.power +
       breakdown.equipment +
-      badges.length;
+      breakdown.efficiency;
 
     return {
       ...vehicle,
@@ -105,14 +140,14 @@ function enrichVehicles(vehicles) {
     };
   });
 
-  enriched.sort((left, right) => {
-    if (right.recommendationScore !== left.recommendationScore) {
-      return right.recommendationScore - left.recommendationScore;
+  enriched.sort((a, b) => {
+    if (b.recommendationScore !== a.recommendationScore) {
+      return b.recommendationScore - a.recommendationScore;
     }
-
-    const leftPrice = left.totalPricePln ?? Number.MAX_SAFE_INTEGER;
-    const rightPrice = right.totalPricePln ?? Number.MAX_SAFE_INTEGER;
-    return leftPrice - rightPrice;
+    // Remis: tańszy wygrywa
+    const priceA = a.totalPricePln ?? Number.MAX_SAFE_INTEGER;
+    const priceB = b.totalPricePln ?? Number.MAX_SAFE_INTEGER;
+    return priceA - priceB;
   });
 
   return {
@@ -126,4 +161,5 @@ function enrichVehicles(vehicles) {
 
 module.exports = {
   enrichVehicles,
+  SCORING_WEIGHTS,
 };

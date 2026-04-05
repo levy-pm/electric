@@ -18,7 +18,6 @@ const DEFAULT_HIDDEN_FIELDS = new Set([
   'notes',
   'equipmentPackages',
   'additionalEquipmentCount',
-  'energyConsumptionKwh100km',
 ]);
 
 const state = {
@@ -37,11 +36,13 @@ const state = {
   modalReturnFocus: null,
 };
 
+// Etykiety odznak liderów — muszą być identyczne z BADGE_* w src/recommendation.js
 const leaderLabels = {
   bestPrice: '💰 Najlepsza cena',
   bestRange: '🔋 Największy zasięg',
   bestBattery: '⚡ Największa bateria',
-  bestEquipment: '🌿 Najbardziej ekologiczne wyposażenie',
+  bestPower: '🚀 Największa moc',
+  bestEquipment: '🌿 Najbogatsze wyposażenie',
 };
 
 function currencyFormatter(value) {
@@ -403,18 +404,19 @@ function updateSummary(items) {
     .map((badge) => `<span class="badge">${escapeHtml(badge)}</span>`)
     .join('');
 
-  const leaders = {};
+  // Mapa: badge string → pierwszy pojazd z tą odznaką
+  const leaderByBadge = {};
   items.forEach((item) => {
     (item.recommendationBadges || []).forEach((badge) => {
-      if (!leaders[badge]) {
-        leaders[badge] = item;
+      if (!leaderByBadge[badge]) {
+        leaderByBadge[badge] = item;
       }
     });
   });
 
   leaderCards.innerHTML = Object.values(leaderLabels)
     .map((label) => {
-      const item = Object.values(leaders).find((leader) => (leader.recommendationBadges || []).includes(label));
+      const item = leaderByBadge[label]; // dopasowanie po identycznym stringu
       if (!item) {
         return '';
       }
