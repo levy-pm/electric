@@ -3,7 +3,6 @@ const DEFAULT_HIDDEN_FIELDS = new Set([
   'allEquipment',
   'powerKw',
   'torqueNm',
-  'brand',
   'model',
   'versionName',
   'exteriorColor',
@@ -347,6 +346,7 @@ function getColumns() {
       minWidth: 220,
       headerSort: false,
     },
+    { title: 'Marka', field: 'brand', minWidth: 120, formatter: (cell) => clampText(cell.getValue()) },
     {
       title: 'Model',
       field: 'displayName',
@@ -489,7 +489,6 @@ function getColumns() {
       hozAlign: 'right',
       formatter: (cell) => numberFormatter(cell.getValue(), 'kWh/100 km'),
     },
-    { title: 'Marka', field: 'brand', minWidth: 120, visible: false, formatter: (cell) => clampText(cell.getValue()) },
     { title: 'Model skrócony', field: 'model', minWidth: 140, visible: false, formatter: (cell) => clampText(cell.getValue()) },
     { title: 'Wersja', field: 'versionName', minWidth: 220, visible: false, formatter: (cell) => clampText(cell.getValue()) },
     { title: 'Kolor', field: 'exteriorColor', minWidth: 180, visible: false, formatter: (cell) => clampText(cell.getValue()) },
