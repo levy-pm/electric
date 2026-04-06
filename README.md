@@ -97,6 +97,7 @@ npm run deploy:sync
 - `POST /api/upload` - upload jednego PDF-a pod polem `configurationPdf`
 - `POST /api/upload-async` - asynchroniczny upload jednego PDF-a pod polem `configurationPdf`
 - `GET /api/uploads/:uploadId/status` - status przetwarzania uploadu i gotowe rekordy
+- `POST /api/uploads/:uploadId/complete` - zapisuje gotowy wynik parsowania dla istniejącego uploadu
 - `GET /api/config` - podstawowa konfiguracja klienta
 - `GET /healthz` - prosty healthcheck + status ostatniego deploya
 

@@ -309,6 +309,67 @@ async function createApp() {
     });
   }));
 
+  app.post('/api/uploads/:uploadId/complete', asyncRoute(async (req, res) => {
+    const uploadEntry = await store.getUploadById(req.params.uploadId);
+    if (!uploadEntry) {
+      res.status(404).json({ error: 'Nie znaleziono importu.' });
+      return;
+    }
+
+    const inputVehicles = Array.isArray(req.body && req.body.vehicles) ? req.body.vehicles : [];
+    if (!inputVehicles.length) {
+      res.status(400).json({ error: 'Przekaz tablice vehicles z co najmniej jednym rekordem.' });
+      return;
+    }
+
+    const vehicles = inputVehicles.map((vehicle) => ({
+      id: normalizeOptionalText(vehicle.id) || randomUUID(),
+      brand: normalizeOptionalText(vehicle.brand),
+      model: normalizeOptionalText(vehicle.model),
+      versionName: normalizeOptionalText(vehicle.versionName),
+      displayName: normalizeOptionalText(vehicle.displayName),
+      currency: normalizeOptionalText(vehicle.currency) || 'PLN',
+      basePricePln: vehicle.basePricePln ?? null,
+      totalPricePln: vehicle.totalPricePln ?? null,
+      powerKw: vehicle.powerKw ?? null,
+      powerHp: vehicle.powerHp ?? null,
+      torqueNm: vehicle.torqueNm ?? null,
+      rangeWltpKm: vehicle.rangeWltpKm ?? null,
+      batteryCapacityKwh: vehicle.batteryCapacityKwh ?? null,
+      energyConsumptionKwh100km: vehicle.energyConsumptionKwh100km ?? null,
+      seats: vehicle.seats ?? null,
+      fuelType: normalizeOptionalText(vehicle.fuelType),
+      homologationStandard: normalizeOptionalText(vehicle.homologationStandard),
+      co2EmissionGkm: vehicle.co2EmissionGkm ?? null,
+      technicalType: normalizeOptionalText(vehicle.technicalType),
+      exteriorColor: normalizeOptionalText(vehicle.exteriorColor),
+      exteriorColorPricePln: vehicle.exteriorColorPricePln ?? null,
+      wheels: normalizeOptionalText(vehicle.wheels),
+      wheelsPricePln: vehicle.wheelsPricePln ?? null,
+      interiorTrim: normalizeOptionalText(vehicle.interiorTrim),
+      interiorPricePln: vehicle.interiorPricePln ?? null,
+      configurationCode: normalizeOptionalText(vehicle.configurationCode),
+      sourceDate: normalizeOptionalText(vehicle.sourceDate),
+      additionalEquipment: Array.isArray(vehicle.additionalEquipment) ? vehicle.additionalEquipment : [],
+      standardEquipment: Array.isArray(vehicle.standardEquipment) ? vehicle.standardEquipment : [],
+      equipmentPackages: Array.isArray(vehicle.equipmentPackages) ? vehicle.equipmentPackages : [],
+      notes: Array.isArray(vehicle.notes) ? vehicle.notes : [],
+      warnings: Array.isArray(vehicle.warnings) ? vehicle.warnings : [],
+      combustionEquivalents: Array.isArray(vehicle.combustionEquivalents) ? vehicle.combustionEquivalents : [],
+      equipmentScore: vehicle.equipmentScore ?? null,
+      createdAt: normalizeOptionalText(vehicle.createdAt) || new Date().toISOString(),
+    }));
+
+    await store.markUploadCompleted(uploadEntry.id, vehicles);
+
+    const rateInfo = await getEurExchangeRate();
+    res.status(201).json({
+      message: 'Import zostal zapisany jako zakonczony.',
+      uploadId: uploadEntry.id,
+      items: vehicles.map((vehicle) => toClientVehicle(vehicle, rateInfo)),
+    });
+  }));
+
   app.post('/api/upload', uploadLimiter, upload.single('configurationPdf'), asyncRoute(async (req, res) => {
     if (!req.file) {
       res.status(400).json({ error: 'Nie przeslano pliku PDF.' });
