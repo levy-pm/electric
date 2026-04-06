@@ -187,6 +187,29 @@ function normalizeStringArray(field, value) {
   return value.map((item) => String(item || '').trim()).filter(Boolean);
 }
 
+function enrichExtractedVehicles(extraction) {
+  return Promise.all((extraction.vehicles || []).map(async (vehicle) => ({
+    ...vehicle,
+    combustionEquivalents: await findCombustionEquivalents(vehicle.brand, vehicle.model).catch(() => []),
+    createdAt: new Date().toISOString(),
+  })));
+}
+
+async function processUploadInBackground(uploadEntry, processor) {
+  try {
+    const extraction = await processor();
+    const vehicles = await enrichExtractedVehicles(extraction);
+    await store.markUploadCompleted(uploadEntry.id, vehicles);
+    return {
+      parser: extraction.parser || null,
+      vehicles,
+    };
+  } catch (error) {
+    await store.markUploadFailed(uploadEntry.id, error.message);
+    throw error;
+  }
+}
+
 async function createApp() {
   ensureDirectories();
   await store.initStore();
@@ -261,6 +284,31 @@ async function createApp() {
     res.download(filePath, uploadEntry.originalName || safeName);
   }));
 
+  app.get('/api/uploads/:uploadId/status', asyncRoute(async (req, res) => {
+    const uploadEntry = await store.getUploadById(req.params.uploadId);
+    if (!uploadEntry) {
+      res.status(404).json({ error: 'Nie znaleziono importu.' });
+      return;
+    }
+
+    let items = [];
+    if (uploadEntry.parseStatus === 'completed') {
+      const rateInfo = await getEurExchangeRate();
+      const vehicles = await store.listVehicles();
+      items = vehicles
+        .filter((vehicle) => vehicle.uploadId === uploadEntry.id)
+        .map((vehicle) => toClientVehicle(vehicle, rateInfo));
+    }
+
+    res.json({
+      uploadId: uploadEntry.id,
+      status: uploadEntry.parseStatus,
+      error: uploadEntry.parseError || null,
+      parsedAt: uploadEntry.parsedAt || null,
+      items,
+    });
+  }));
+
   app.post('/api/upload', uploadLimiter, upload.single('configurationPdf'), asyncRoute(async (req, res) => {
     if (!req.file) {
       res.status(400).json({ error: 'Nie przeslano pliku PDF.' });
@@ -271,14 +319,10 @@ async function createApp() {
 
     try {
       const rateInfo = await getEurExchangeRate();
-      const extraction = await extractVehicleFromPdf(req.file.path, req.file.originalname);
-      const vehicles = await Promise.all(extraction.vehicles.map(async (vehicle) => ({
-        ...vehicle,
-        combustionEquivalents: await findCombustionEquivalents(vehicle.brand, vehicle.model).catch(() => []),
-        createdAt: new Date().toISOString(),
-      })));
-
-      await store.markUploadCompleted(uploadEntry.id, vehicles);
+      const { vehicles } = await processUploadInBackground(
+        uploadEntry,
+        () => extractVehicleFromPdf(req.file.path, req.file.originalname)
+      );
 
       res.status(201).json({
         message: 'Plik zostal odczytany i dodany do tabeli.',
@@ -289,6 +333,30 @@ async function createApp() {
       await store.markUploadFailed(uploadEntry.id, error.message);
       throw error;
     }
+  }));
+
+  app.post('/api/upload-async', uploadLimiter, upload.single('configurationPdf'), asyncRoute(async (req, res) => {
+    if (!req.file) {
+      res.status(400).json({ error: 'Nie przeslano pliku PDF.' });
+      return;
+    }
+
+    const uploadEntry = await store.createUpload(req.file);
+
+    setImmediate(() => {
+      processUploadInBackground(
+        uploadEntry,
+        () => extractVehicleFromPdf(req.file.path, req.file.originalname)
+      ).catch((error) => {
+        console.error('Asynchroniczny import PDF nie powiodl sie:', error);
+      });
+    });
+
+    res.status(202).json({
+      message: 'Plik zostal przyjety do przetworzenia.',
+      uploadId: uploadEntry.id,
+      status: 'processing',
+    });
   }));
 
   app.post('/api/import-url', uploadLimiter, asyncRoute(async (req, res) => {
@@ -309,23 +377,18 @@ async function createApp() {
 
     try {
       const rateInfo = await getEurExchangeRate();
-      const extraction = await importVehicleFromUrl(sourceUrl);
-      const vehicles = await Promise.all(extraction.vehicles.map(async (vehicle) => ({
-        ...vehicle,
-        combustionEquivalents: await findCombustionEquivalents(vehicle.brand, vehicle.model).catch(() => []),
-        createdAt: new Date().toISOString(),
-      })));
-
-      await store.markUploadCompleted(uploadEntry.id, vehicles);
+      const { parser, vehicles } = await processUploadInBackground(
+        uploadEntry,
+        () => importVehicleFromUrl(sourceUrl)
+      );
 
       res.status(201).json({
         message: 'Link zostal odczytany i dodany do tabeli.',
         uploadId: uploadEntry.id,
-        parser: extraction.parser,
+        parser,
         items: vehicles.map((vehicle) => toClientVehicle(vehicle, rateInfo)),
       });
     } catch (error) {
-      await store.markUploadFailed(uploadEntry.id, error.message);
       throw error;
     }
   }));

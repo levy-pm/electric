@@ -563,6 +563,8 @@ async function getUploadById(uploadId) {
     sourceType: row.source_type || 'upload',
     sourceUrl: row.source_url || null,
     parseStatus: row.parse_status,
+    parseError: row.parse_error || null,
+    parsedAt: row.parsed_at || null,
   };
 }
 

@@ -95,6 +95,8 @@ npm run deploy:sync
 
 - `GET /api/cars` - rekordy do tabeli
 - `POST /api/upload` - upload jednego PDF-a pod polem `configurationPdf`
+- `POST /api/upload-async` - asynchroniczny upload jednego PDF-a pod polem `configurationPdf`
+- `GET /api/uploads/:uploadId/status` - status przetwarzania uploadu i gotowe rekordy
 - `GET /api/config` - podstawowa konfiguracja klienta
 - `GET /healthz` - prosty healthcheck + status ostatniego deploya
 
