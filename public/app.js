@@ -359,12 +359,12 @@ const packageEditor = function (cell, onRendered, success, cancel) {
 
 function editableClampFormatter(value) {
   const text = value !== null && value !== undefined && value !== '' ? String(value) : null;
-  return `<span class="cell-clamp cell-editable">${text ? escapeHtml(text) : 'â€”'}</span>`;
+  return `<span class="cell-clamp cell-editable">${text ? escapeHtml(text) : '\u2014'}</span>`;
 }
 
 function editableArrayFormatter(values) {
   const text = Array.isArray(values) && values.length ? values.join(', ') : null;
-  return `<span class="cell-clamp cell-editable">${text ? escapeHtml(text) : 'â€”'}</span>`;
+  return `<span class="cell-clamp cell-editable">${text ? escapeHtml(text) : '\u2014'}</span>`;
 }
 
 function editableNumberFormatter(value, unit = '', maximumFractionDigits = 1) {
