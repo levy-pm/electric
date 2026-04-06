@@ -456,57 +456,30 @@ button {
 
 .table-scroll-shell {
   width: 100%;
-  overflow: visible;
-  border-radius: 18px 18px 0 0;
 }
 
-/* Ukryj wewnętrzny scrollbar Tabulatora — zastępuje go .table-hscroll */
+/* === NATYWNY SCROLLBAR TABULATORA — ostylowany w motywie === */
+
 .tabulator .tabulator-tableholder {
-  scrollbar-width: none; /* Firefox */
-}
-.tabulator .tabulator-tableholder::-webkit-scrollbar {
-  display: none; /* Chrome / Safari */
-}
-
-/* === STICKY HORIZONTAL SCROLLBAR === */
-
-.table-hscroll {
-  position: sticky;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  overflow-x: auto;
-  overflow-y: hidden;
-  height: 12px;
-  border-radius: 0 0 18px 18px;
-  opacity: 0;
-  transition: opacity 0.18s ease;
-  z-index: 10;
-  scrollbar-color: var(--accent) var(--eco-light);
   scrollbar-width: thin;
+  scrollbar-color: var(--accent) var(--eco-light);
 }
 
-.table-panel:hover .table-hscroll {
-  opacity: 1;
+.tabulator .tabulator-tableholder::-webkit-scrollbar {
+  height: 10px;
 }
 
-.table-hscroll-track {
-  height: 1px; /* szerokość ustawiana przez JS */
-}
-
-.table-hscroll::-webkit-scrollbar {
-  height: 12px;
-}
-.table-hscroll::-webkit-scrollbar-track {
+.tabulator .tabulator-tableholder::-webkit-scrollbar-track {
   background: var(--eco-light);
-  border-radius: 0 0 18px 18px;
 }
-.table-hscroll::-webkit-scrollbar-thumb {
+
+.tabulator .tabulator-tableholder::-webkit-scrollbar-thumb {
   background: var(--accent);
-  border-radius: 6px;
+  border-radius: 5px;
   border: 2px solid var(--eco-light);
 }
-.table-hscroll::-webkit-scrollbar-thumb:hover {
+
+.tabulator .tabulator-tableholder::-webkit-scrollbar-thumb:hover {
   background: var(--accent-strong);
 }
 

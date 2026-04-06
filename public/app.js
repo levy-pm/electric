@@ -1273,55 +1273,10 @@ function renderColumnsDrawerContent() {
   });
 }
 
-function initStickyScroll() {
-  // Tabulator scrolluje wewnętrznie przez .tabulator-tableholder
-  const tableHolder = document.querySelector('.tabulator-tableholder');
-  const hscroll = document.getElementById('tableHscroll');
-  const track = document.getElementById('tableHscrollTrack');
-
-  if (!tableHolder || !hscroll || !track) {
-    return;
-  }
-
-  function syncWidth() {
-    track.style.width = tableHolder.scrollWidth + 'px';
-    hscroll.scrollLeft = tableHolder.scrollLeft;
-  }
-
-  let lockHolder = false;
-  let lockHscroll = false;
-
-  tableHolder.addEventListener('scroll', () => {
-    if (lockHscroll) {
-      return;
-    }
-    lockHolder = true;
-    hscroll.scrollLeft = tableHolder.scrollLeft;
-    lockHolder = false;
-  });
-
-  hscroll.addEventListener('scroll', () => {
-    if (lockHolder) {
-      return;
-    }
-    lockHscroll = true;
-    tableHolder.scrollLeft = hscroll.scrollLeft;
-    lockHscroll = false;
-  });
-
-  // Obserwuj zmiany szerokości kontenera tabeli
-  const observer = new ResizeObserver(syncWidth);
-  observer.observe(tableHolder);
-  const container = document.getElementById('tableContainer');
-  if (container) {
-    observer.observe(container);
-  }
-
-  syncWidth();
-}
 
 function createTable(items) {
   if (state.table) {
+    state.table.setColumns(getColumns());
     state.table.replaceData(items);
     renderColumnsDrawerContent();
     return;
@@ -1368,7 +1323,6 @@ function createTable(items) {
   state.table.on('tableBuilt', async () => {
     await enhanceEditableColumns();
     renderColumnsDrawerContent();
-    initStickyScroll();
   });
   state.table.on('columnMoved', renderColumnsDrawerContent);
   state.table.on('columnVisibilityChanged', renderColumnsDrawerContent);
