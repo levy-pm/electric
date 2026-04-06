@@ -118,7 +118,51 @@ async function extractVehicleFromSourceText(sourceLabel, sourceText) {
   return generateVehicleExtraction(buildTextPrompt(sourceLabel, trimmedText));
 }
 
+async function findCombustionEquivalents(brand, model) {
+  if (!brand && !model) {
+    return [];
+  }
+
+  validateConfig({ allowMissingGemini: false });
+  const ai = new GoogleGenAI({ apiKey: config.geminiApiKey });
+
+  const carName = [brand, model].filter(Boolean).join(' ');
+  const prompt = [
+    `Znajdź auta spalinowe (benzyna lub diesel) o podobnych gabarytach i segmencie rynkowym do elektrycznego ${carName}.`,
+    'Skorzystaj z aktualnych informacji, uwzględniając wymiary, kategorię nadwozia i pozycję cenową.',
+    'Podaj dokładnie 3-5 konkretnych modeli spalinowych jako tablicę JSON: ["Marka Model", ...].',
+    'Odpowiedz TYLKO surową tablicą JSON, bez opisu, bez markdown.',
+  ].join(' ');
+
+  try {
+    const response = await ai.models.generateContent({
+      model: config.geminiModel,
+      contents: prompt,
+      config: {
+        tools: [{ googleSearch: {} }],
+      },
+    });
+
+    const text = (response.text || '').trim();
+    const match = text.match(/\[[\s\S]*?\]/);
+    if (match) {
+      const parsed = JSON.parse(match[0]);
+      if (Array.isArray(parsed)) {
+        return parsed
+          .map((s) => (typeof s === 'string' ? s.trim() : ''))
+          .filter(Boolean)
+          .slice(0, 5);
+      }
+    }
+  } catch {
+    // Brak odpowiedzi lub błąd parsowania — zwracamy pustą listę
+  }
+
+  return [];
+}
+
 module.exports = {
   extractVehicleFromPdf,
   extractVehicleFromSourceText,
+  findCombustionEquivalents,
 };

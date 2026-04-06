@@ -456,13 +456,15 @@ button {
 
 .table-scroll-shell {
   width: 100%;
-  overflow-x: auto;
-  overflow-y: clip; /* clip pionowo (dla border-radius) bez blokowania scroll X */
+  overflow: visible;
   border-radius: 18px 18px 0 0;
-  /* Ukryj natywny scrollbar — zastępuje go .table-hscroll */
+}
+
+/* Ukryj wewnętrzny scrollbar Tabulatora — zastępuje go .table-hscroll */
+.tabulator .tabulator-tableholder {
   scrollbar-width: none; /* Firefox */
 }
-.table-scroll-shell::-webkit-scrollbar {
+.tabulator .tabulator-tableholder::-webkit-scrollbar {
   display: none; /* Chrome / Safari */
 }
 
@@ -891,6 +893,96 @@ button {
 
 .toast-close:hover {
   opacity: 1;
+}
+
+/* === PAGINACJA TABULATOR === */
+
+.tabulator .tabulator-footer {
+  background: var(--surface-muted) !important;
+  border-top: 1px solid var(--line) !important;
+  padding: 10px 16px !important;
+}
+
+.tabulator .tabulator-footer .tabulator-footer-contents {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.tabulator .tabulator-footer .tabulator-page-counter {
+  color: var(--muted);
+  font-size: 0.88rem;
+  font-weight: 600;
+  order: -1;
+}
+
+.tabulator .tabulator-footer .tabulator-paginator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.tabulator .tabulator-footer .tabulator-page-size {
+  min-height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface-strong);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 700;
+  cursor: pointer;
+  appearance: auto;
+}
+
+.tabulator .tabulator-footer .tabulator-page-size:focus {
+  outline: 2px solid rgba(0, 127, 115, 0.22);
+  border-color: var(--accent);
+}
+
+.tabulator .tabulator-footer .tabulator-pages {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0 4px;
+}
+
+.tabulator .tabulator-footer .tabulator-page {
+  min-width: 34px;
+  min-height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface-strong);
+  color: var(--text);
+  font-size: 0.88rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.14s, border-color 0.14s, color 0.14s;
+}
+
+.tabulator .tabulator-footer .tabulator-page:hover:not(:disabled) {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent-strong);
+  transform: none;
+}
+
+.tabulator .tabulator-footer .tabulator-page.active {
+  background: var(--accent) !important;
+  border-color: var(--accent) !important;
+  color: #fff !important;
+}
+
+.tabulator .tabulator-footer .tabulator-page:disabled {
+  opacity: 0.35;
+  cursor: default;
 }
 
 /* === PAKIETY — wyświetlanie jeden pod drugim === */

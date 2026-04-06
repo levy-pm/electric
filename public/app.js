@@ -49,6 +49,7 @@ const leaderLabels = {
 };
 
 const INLINE_ARRAY_FIELDS = new Set([
+  'combustionEquivalents',
   'equipmentPackages',
   'notes',
 ]);
@@ -657,6 +658,11 @@ function getEditableColumnOverrides() {
       editor: arrayInputEditor,
       cellEdited: makeArrayCellEdited('equipmentPackages'),
     },
+    combustionEquivalents: {
+      formatter: (cell) => editableArrayFormatter(cell.getValue()),
+      editor: arrayInputEditor,
+      cellEdited: makeArrayCellEdited('combustionEquivalents'),
+    },
     powerHp: {
       formatter: (cell) => editableNumberFormatter(cell.getValue(), 'KM'),
       editor: 'number',
@@ -1035,6 +1041,15 @@ function getColumns() {
       cellEdited: makeTextCellEdited('displayName'),
     },
     {
+      title: 'Gabaryt',
+      field: 'combustionEquivalents',
+      minWidth: 220,
+      widthGrow: 2,
+      formatter: (cell) => textArrayFormatter(cell.getValue()),
+      editor: arrayInputEditor,
+      cellEdited: makeArrayCellEdited('combustionEquivalents'),
+    },
+    {
       title: 'Konfiguracja',
       field: 'uploadId',
       minWidth: 100,
@@ -1259,44 +1274,44 @@ function renderColumnsDrawerContent() {
 }
 
 function initStickyScroll() {
-  const shell = document.querySelector('.table-scroll-shell');
+  // Tabulator scrolluje wewnętrznie przez .tabulator-tableholder
+  const tableHolder = document.querySelector('.tabulator-tableholder');
   const hscroll = document.getElementById('tableHscroll');
   const track = document.getElementById('tableHscrollTrack');
 
-  if (!shell || !hscroll || !track) {
+  if (!tableHolder || !hscroll || !track) {
     return;
   }
 
   function syncWidth() {
-    track.style.width = shell.scrollWidth + 'px';
-    // Wyrównaj pozycję po zmianie szerokości
-    hscroll.scrollLeft = shell.scrollLeft;
+    track.style.width = tableHolder.scrollWidth + 'px';
+    hscroll.scrollLeft = tableHolder.scrollLeft;
   }
 
-  let lockShell = false;
+  let lockHolder = false;
   let lockHscroll = false;
 
-  shell.addEventListener('scroll', () => {
+  tableHolder.addEventListener('scroll', () => {
     if (lockHscroll) {
       return;
     }
-    lockShell = true;
-    hscroll.scrollLeft = shell.scrollLeft;
-    lockShell = false;
+    lockHolder = true;
+    hscroll.scrollLeft = tableHolder.scrollLeft;
+    lockHolder = false;
   });
 
   hscroll.addEventListener('scroll', () => {
-    if (lockShell) {
+    if (lockHolder) {
       return;
     }
     lockHscroll = true;
-    shell.scrollLeft = hscroll.scrollLeft;
+    tableHolder.scrollLeft = hscroll.scrollLeft;
     lockHscroll = false;
   });
 
   // Obserwuj zmiany szerokości kontenera tabeli
   const observer = new ResizeObserver(syncWidth);
-  observer.observe(shell);
+  observer.observe(tableHolder);
   const container = document.getElementById('tableContainer');
   if (container) {
     observer.observe(container);
@@ -1320,6 +1335,34 @@ function createTable(items) {
     placeholder: '<div class="empty-state">Brak konfiguracji. Dodaj pierwszy PDF albo link, aby zbudować tabelę.</div>',
     rowFormatter: topRowFormatter,
     columns: getColumns(),
+    pagination: true,
+    paginationSize: 30,
+    paginationSizeSelector: [10, 30, 50, 100, true],
+    paginationCounter: 'rows',
+    locale: 'pl',
+    langs: {
+      pl: {
+        pagination: {
+          page_size: 'Na stronę',
+          page_title: 'Pokaż stronę',
+          first: '«',
+          first_title: 'Pierwsza',
+          last: '»',
+          last_title: 'Ostatnia',
+          prev: '‹',
+          prev_title: 'Poprzednia',
+          next: '›',
+          next_title: 'Następna',
+          all: 'Wszystkie',
+          counter: {
+            showing: 'Wyniki',
+            of: 'z',
+            rows: '',
+            pages: 'str.',
+          },
+        },
+      },
+    },
   });
 
   state.table.on('tableBuilt', async () => {

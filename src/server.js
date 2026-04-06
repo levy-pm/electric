@@ -7,7 +7,7 @@ const rateLimit = require('express-rate-limit');
 const sanitizeFilename = require('sanitize-filename');
 const { config } = require('./config');
 const { buildEquipmentEntries } = require('./equipment');
-const { extractVehicleFromPdf } = require('./gemini');
+const { extractVehicleFromPdf, findCombustionEquivalents } = require('./gemini');
 const { importVehicleFromUrl } = require('./url-import');
 const { enrichVehiclePrices, getEurExchangeRate } = require('./nbp');
 const { enrichVehicles } = require('./recommendation');
@@ -146,7 +146,7 @@ const PATCH_INTEGER_FIELDS = new Set([
   'interiorPricePln',
 ]);
 
-const PATCH_ARRAY_FIELDS = ['equipmentPackages', 'standardEquipment', 'additionalEquipment', 'notes'];
+const PATCH_ARRAY_FIELDS = ['equipmentPackages', 'standardEquipment', 'additionalEquipment', 'notes', 'combustionEquivalents'];
 
 function normalizeOptionalText(value) {
   if (value === null || value === undefined) {
@@ -272,10 +272,11 @@ async function createApp() {
     try {
       const rateInfo = await getEurExchangeRate();
       const extraction = await extractVehicleFromPdf(req.file.path, req.file.originalname);
-      const vehicles = extraction.vehicles.map((vehicle) => ({
+      const vehicles = await Promise.all(extraction.vehicles.map(async (vehicle) => ({
         ...vehicle,
+        combustionEquivalents: await findCombustionEquivalents(vehicle.brand, vehicle.model).catch(() => []),
         createdAt: new Date().toISOString(),
-      }));
+      })));
 
       await store.markUploadCompleted(uploadEntry.id, vehicles);
 
@@ -309,10 +310,11 @@ async function createApp() {
     try {
       const rateInfo = await getEurExchangeRate();
       const extraction = await importVehicleFromUrl(sourceUrl);
-      const vehicles = extraction.vehicles.map((vehicle) => ({
+      const vehicles = await Promise.all(extraction.vehicles.map(async (vehicle) => ({
         ...vehicle,
+        combustionEquivalents: await findCombustionEquivalents(vehicle.brand, vehicle.model).catch(() => []),
         createdAt: new Date().toISOString(),
-      }));
+      })));
 
       await store.markUploadCompleted(uploadEntry.id, vehicles);
 

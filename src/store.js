@@ -65,6 +65,7 @@ function mapVehicleRow(row) {
     equipmentPackages: parseJson(row.equipment_packages),
     notes: parseJson(row.notes),
     warnings: parseJson(row.warnings),
+    combustionEquivalents: parseJson(row.combustion_equivalents),
     equipmentScore: row.equipment_score,
     createdAt: row.created_at,
   };
@@ -105,6 +106,7 @@ const VEHICLE_JSON_COLUMNS = {
   equipmentPackages: 'equipment_packages',
   notes: 'notes',
   warnings: 'warnings',
+  combustionEquivalents: 'combustion_equivalents',
 };
 
 async function initMariaDbPool() {
@@ -147,6 +149,7 @@ async function ensureMariaDbSchema() {
 
   await db.query(`ALTER TABLE uploads ADD COLUMN IF NOT EXISTS source_type VARCHAR(16) NOT NULL DEFAULT 'upload'`);
   await db.query(`ALTER TABLE uploads ADD COLUMN IF NOT EXISTS source_url TEXT NULL`);
+  await db.query(`ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS combustion_equivalents JSON NULL`);
 
   await db.query(`
     CREATE TABLE IF NOT EXISTS vehicles (
@@ -183,6 +186,7 @@ async function ensureMariaDbSchema() {
       equipment_packages JSON NULL,
       notes JSON NULL,
       warnings JSON NULL,
+      combustion_equivalents JSON NULL,
       equipment_score INT NOT NULL DEFAULT 0,
       created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       CONSTRAINT fk_vehicles_upload FOREIGN KEY (upload_id) REFERENCES uploads(id) ON DELETE CASCADE
@@ -305,8 +309,8 @@ async function markUploadCompleted(uploadId, vehicles) {
           exterior_color, exterior_color_price_pln, wheels, wheels_price_pln,
           interior_trim, interior_price_pln, configuration_code, source_date,
           additional_equipment, standard_equipment, equipment_packages, notes, warnings,
-          equipment_score
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          combustion_equivalents, equipment_score
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           vehicle.id,
           uploadId,
@@ -341,6 +345,7 @@ async function markUploadCompleted(uploadId, vehicles) {
           serializeJson(vehicle.equipmentPackages),
           serializeJson(vehicle.notes),
           serializeJson(vehicle.warnings),
+          serializeJson(vehicle.combustionEquivalents),
           vehicle.equipmentScore,
         ]
       );
