@@ -686,17 +686,68 @@ button {
 .column-toggle {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-  padding: 12px 14px;
-  border-radius: 14px;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
   background: var(--surface-muted);
   border: 1px solid var(--line);
+  cursor: default;
+  transition: background 0.12s, border-color 0.12s;
+  user-select: none;
+}
+
+.column-toggle:hover {
+  background: var(--eco-light);
+  border-color: var(--line-strong);
+}
+
+.column-toggle.is-dragging {
+  opacity: 0.4;
+}
+
+.column-toggle.drag-over-top {
+  border-top: 2px solid var(--accent);
+}
+
+.column-toggle.drag-over-bottom {
+  border-bottom: 2px solid var(--accent);
+}
+
+.drag-handle {
+  flex: none;
+  color: var(--muted);
+  font-size: 1rem;
+  cursor: grab;
+  letter-spacing: -3px;
+  opacity: 0.5;
+  transition: opacity 0.12s;
+}
+
+.column-toggle:hover .drag-handle {
+  opacity: 1;
+}
+
+.drag-handle:active {
+  cursor: grabbing;
+}
+
+.column-toggle-label {
+  flex: 1;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .column-toggle input {
+  flex: none;
   width: 18px;
   height: 18px;
+  cursor: pointer;
+  accent-color: var(--accent);
 }
 
 .modal-panel {
@@ -881,7 +932,7 @@ button {
 .tabulator .tabulator-footer .tabulator-footer-contents {
   display: flex !important;
   align-items: center !important;
-  justify-content: space-between !important;
+  justify-content: flex-start !important;
   flex-wrap: wrap !important;
   gap: 10px !important;
   white-space: nowrap !important;
@@ -891,9 +942,11 @@ button {
   color: #4a6b5a !important;
   font-size: 0.86rem !important;
   font-weight: 600 !important;
+  flex: none !important;
 }
 
 .tabulator .tabulator-footer .tabulator-paginator {
+  flex: 1 !important;
   display: flex !important;
   align-items: center !important;
   gap: 6px !important;
@@ -923,7 +976,7 @@ button {
   display: flex !important;
   align-items: center !important;
   gap: 4px !important;
-  margin: 0 !important;
+  margin-left: auto !important;
 }
 
 .tabulator .tabulator-footer .tabulator-page {

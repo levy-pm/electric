@@ -18,6 +18,8 @@ const DEFAULT_HIDDEN_FIELDS = new Set([
   'equipmentPackages',
 ]);
 
+const COLUMN_LAYOUT_KEY = 'electric_columns_v1';
+
 const state = {
   table: null,
   allItems: [],
@@ -32,6 +34,7 @@ const state = {
   activeOverlay: null,
   drawerReturnFocus: null,
   modalReturnFocus: null,
+  applyingLayout: false,
 };
 
 const equipEdit = {
@@ -1235,6 +1238,53 @@ function getColumns() {
   });
 }
 
+function saveColumnLayout() {
+  if (!state.table) return;
+  try {
+    const layout = state.table.getColumns()
+      .filter((col) => col.getField())
+      .map((col) => ({ field: col.getField(), visible: col.isVisible() }));
+    localStorage.setItem(COLUMN_LAYOUT_KEY, JSON.stringify(layout));
+  } catch {}
+}
+
+function loadColumnLayout() {
+  try {
+    const raw = localStorage.getItem(COLUMN_LAYOUT_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function applyColumnLayout(layout) {
+  if (!state.table || !Array.isArray(layout)) return;
+
+  const currentFields = new Set(
+    state.table.getColumns().map((c) => c.getField()).filter(Boolean)
+  );
+  const valid = layout.filter(({ field }) => currentFields.has(field));
+
+  state.applyingLayout = true;
+  try {
+    // Widoczność
+    for (const { field, visible } of valid) {
+      const col = state.table.getColumns().find((c) => c.getField() === field);
+      if (!col) continue;
+      visible ? col.show() : col.hide();
+    }
+
+    // Kolejność — od końca, każda kolumna przesuwa się PRZED następną
+    for (let i = valid.length - 2; i >= 0; i--) {
+      state.table.moveColumn(valid[i].field, valid[i + 1].field, false);
+    }
+  } finally {
+    state.applyingLayout = false;
+  }
+}
+
 function renderColumnsDrawerContent() {
   const columnsList = document.getElementById('columnsList');
   columnsList.innerHTML = '';
@@ -1244,33 +1294,77 @@ function renderColumnsDrawerContent() {
     return;
   }
 
-  state.table.getColumns().forEach((column) => {
-    const field = column.getField();
-    if (!field) {
-      return;
-    }
+  let dragSrcField = null;
 
-    const toggle = document.createElement('label');
-    toggle.className = 'column-toggle';
+  state.table.getColumns()
+    .filter((col) => col.getField())
+    .forEach((column) => {
+      const field = column.getField();
 
-    const label = document.createElement('span');
-    label.textContent = column.getDefinition().title;
+      const item = document.createElement('div');
+      item.className = 'column-toggle';
+      item.draggable = true;
+      item.dataset.field = field;
 
-    const input = document.createElement('input');
-    input.type = 'checkbox';
-    input.checked = column.isVisible();
-    input.addEventListener('change', () => {
-      if (input.checked) {
-        column.show();
-      } else {
-        column.hide();
-      }
-      renderColumnsDrawerContent();
+      const handle = document.createElement('span');
+      handle.className = 'drag-handle';
+      handle.setAttribute('aria-hidden', 'true');
+      handle.textContent = '\u22ee\u22ee'; // ⋮⋮
+
+      const label = document.createElement('span');
+      label.className = 'column-toggle-label';
+      label.textContent = column.getDefinition().title;
+
+      const input = document.createElement('input');
+      input.type = 'checkbox';
+      input.checked = column.isVisible();
+      input.addEventListener('change', () => {
+        if (input.checked) column.show(); else column.hide();
+        saveColumnLayout();
+      });
+
+      item.addEventListener('dragstart', (e) => {
+        dragSrcField = field;
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', field);
+        setTimeout(() => item.classList.add('is-dragging'), 0);
+      });
+
+      item.addEventListener('dragend', () => {
+        item.classList.remove('is-dragging');
+        columnsList.querySelectorAll('.drag-over-top, .drag-over-bottom')
+          .forEach((el) => el.classList.remove('drag-over-top', 'drag-over-bottom'));
+      });
+
+      item.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        if (!dragSrcField || dragSrcField === field) return;
+        e.dataTransfer.dropEffect = 'move';
+        const rect = item.getBoundingClientRect();
+        const mid = rect.top + rect.height / 2;
+        columnsList.querySelectorAll('.drag-over-top, .drag-over-bottom')
+          .forEach((el) => el.classList.remove('drag-over-top', 'drag-over-bottom'));
+        item.classList.add(e.clientY < mid ? 'drag-over-top' : 'drag-over-bottom');
+      });
+
+      item.addEventListener('dragleave', () => {
+        item.classList.remove('drag-over-top', 'drag-over-bottom');
+      });
+
+      item.addEventListener('drop', (e) => {
+        e.preventDefault();
+        item.classList.remove('drag-over-top', 'drag-over-bottom');
+        if (!dragSrcField || dragSrcField === field) return;
+
+        const rect = item.getBoundingClientRect();
+        const dropAfter = e.clientY >= rect.top + rect.height / 2;
+        state.table.moveColumn(dragSrcField, field, dropAfter);
+        saveColumnLayout();
+      });
+
+      item.append(handle, label, input);
+      columnsList.append(item);
     });
-
-    toggle.append(label, input);
-    columnsList.append(toggle);
-  });
 }
 
 
@@ -1322,10 +1416,25 @@ function createTable(items) {
 
   state.table.on('tableBuilt', async () => {
     await enhanceEditableColumns();
+    const savedLayout = loadColumnLayout();
+    if (savedLayout) {
+      applyColumnLayout(savedLayout);
+    }
     renderColumnsDrawerContent();
   });
-  state.table.on('columnMoved', renderColumnsDrawerContent);
-  state.table.on('columnVisibilityChanged', renderColumnsDrawerContent);
+
+  state.table.on('columnMoved', () => {
+    if (!state.applyingLayout) {
+      saveColumnLayout();
+      renderColumnsDrawerContent();
+    }
+  });
+
+  state.table.on('columnVisibilityChanged', () => {
+    if (!state.applyingLayout) {
+      saveColumnLayout();
+    }
+  });
 
   const tableContainer = document.getElementById('tableContainer');
   if (tableContainer && !tableContainer.dataset.inlineEditBound) {
@@ -1525,19 +1634,10 @@ function resetColumnVisibility() {
     return;
   }
 
-  state.table.getColumns().forEach((column) => {
-    const field = column.getField();
-    if (!field) {
-      return;
-    }
+  try { localStorage.removeItem(COLUMN_LAYOUT_KEY); } catch {}
 
-    if (DEFAULT_HIDDEN_FIELDS.has(field)) {
-      column.hide();
-    } else {
-      column.show();
-    }
-  });
-
+  // Przywróć domyślną kolejność i widoczność przez pełny rebuild kolumn
+  state.table.setColumns(getColumns());
   renderColumnsDrawerContent();
 }
 
