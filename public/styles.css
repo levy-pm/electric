@@ -976,6 +976,10 @@ button {
   display: flex !important;
   align-items: center !important;
   gap: 4px !important;
+  margin-left: 0 !important;
+}
+
+.tabulator .tabulator-footer .tabulator-page[data-page="first"] {
   margin-left: auto !important;
 }
 
