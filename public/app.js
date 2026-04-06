@@ -272,14 +272,27 @@ function getEyeIcon() {
 function rowBadgeFormatter(cell) {
   const badges = cell.getValue();
   const isTop = cell.getRow().getData().isSuggestedTop;
+  const icons = [];
 
-  if (!Array.isArray(badges) || !badges.length) {
-    return isTop
-      ? '<span class="row-badge row-badge--recommended">Rekomendacja AI ★</span>'
-      : '<span class="row-badge">Bez wyróżnienia</span>';
+  if (isTop) {
+    icons.push('<span class="rec-icon" data-tooltip="Nasza rekomendacja" title="Nasza rekomendacja" aria-label="Nasza rekomendacja">★</span>');
   }
 
-  return badges.map((badge) => `<span class="row-badge">${escapeHtml(badge)}</span>`).join('');
+  if (Array.isArray(badges) && badges.length) {
+    for (const badge of badges) {
+      const str = String(badge);
+      const spaceIdx = str.indexOf(' ');
+      const icon = spaceIdx > 0 ? str.slice(0, spaceIdx) : str;
+      const label = spaceIdx > 0 ? str.slice(spaceIdx + 1) : str;
+      icons.push(`<span class="rec-icon" data-tooltip="${escapeHtml(label)}" title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}">${icon}</span>`);
+    }
+  }
+
+  if (!icons.length) {
+    return '<span class="rec-empty">—</span>';
+  }
+
+  return `<div class="rec-icons-row">${icons.join('')}</div>`;
 }
 
 function topRowFormatter(row) {
@@ -998,8 +1011,9 @@ function getColumns() {
       title: 'Rekomendacja',
       field: 'recommendationBadges',
       formatter: rowBadgeFormatter,
-      minWidth: 200,
-      widthGrow: 2,
+      minWidth: 100,
+      widthGrow: 0,
+      hozAlign: 'center',
       headerSort: false,
     },
     {

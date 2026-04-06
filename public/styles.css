@@ -609,6 +609,86 @@ button {
   font-weight: 700;
 }
 
+/* === IKONY REKOMENDACJI Z TOOLTIPEM === */
+
+.rec-icons-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.rec-icon {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  font-size: 1rem;
+  cursor: default;
+  background: var(--accent-soft);
+  transition: background 0.14s, transform 0.12s;
+}
+
+.rec-icon:hover {
+  background: var(--eco-light);
+  transform: translateY(-1px);
+}
+
+.rec-icon::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 7px);
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  background: #0f3d2a;
+  color: #fff;
+  padding: 5px 11px;
+  border-radius: 9px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s;
+  z-index: 9999;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+}
+
+.rec-icon::before {
+  content: '';
+  position: absolute;
+  bottom: calc(100% + 2px);
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: #0f3d2a;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s;
+  z-index: 9999;
+}
+
+.rec-icon:hover::after,
+.rec-icon:hover::before {
+  opacity: 1;
+}
+
+.rec-empty {
+  color: var(--muted);
+  font-weight: 700;
+}
+
+/* Komórka rekomendacji musi mieć overflow: visible żeby tooltip wychodził poza granicę */
+.tabulator-cell:has(.rec-icons-row) {
+  overflow: visible !important;
+  z-index: 2;
+}
+
 .config-action-button {
   display: inline-flex;
   align-items: center;
