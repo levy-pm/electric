@@ -35,6 +35,8 @@ const state = {
   drawerReturnFocus: null,
   modalReturnFocus: null,
   applyingLayout: false,
+  tooltipElement: null,
+  tooltipTarget: null,
 };
 
 const equipEdit = {
@@ -129,6 +131,158 @@ function escapeHtml(value) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
+}
+
+function getTooltipTarget(node) {
+  return node instanceof Element ? node.closest('[data-ui-tooltip]') : null;
+}
+
+function ensureTooltipElement() {
+  if (state.tooltipElement && state.tooltipElement.isConnected) {
+    return state.tooltipElement;
+  }
+
+  const tooltip = document.createElement('div');
+  tooltip.id = 'uiTooltip';
+  tooltip.className = 'ui-tooltip';
+  tooltip.setAttribute('role', 'tooltip');
+  tooltip.setAttribute('aria-hidden', 'true');
+  tooltip.innerHTML = `
+    <div class="ui-tooltip__content"></div>
+    <div class="ui-tooltip__arrow" aria-hidden="true"></div>
+  `;
+  document.body.appendChild(tooltip);
+  state.tooltipElement = tooltip;
+  return tooltip;
+}
+
+function hideTooltip() {
+  if (state.tooltipTarget) {
+    state.tooltipTarget.removeAttribute('aria-describedby');
+  }
+
+  state.tooltipTarget = null;
+
+  if (!state.tooltipElement) {
+    return;
+  }
+
+  state.tooltipElement.classList.remove('is-visible');
+  state.tooltipElement.setAttribute('aria-hidden', 'true');
+}
+
+function positionTooltip() {
+  const tooltip = state.tooltipElement;
+  const target = state.tooltipTarget;
+
+  if (!tooltip || !target || !target.isConnected) {
+    hideTooltip();
+    return;
+  }
+
+  const gap = 12;
+  const viewportPadding = 10;
+  const targetRect = target.getBoundingClientRect();
+
+  tooltip.style.left = '0px';
+  tooltip.style.top = '0px';
+
+  const tooltipRect = tooltip.getBoundingClientRect();
+  let placement = 'top';
+  let top = targetRect.top - tooltipRect.height - gap;
+
+  if (top < viewportPadding) {
+    placement = 'bottom';
+    top = targetRect.bottom + gap;
+  }
+
+  let left = targetRect.left + ((targetRect.width - tooltipRect.width) / 2);
+  left = Math.max(viewportPadding, Math.min(left, window.innerWidth - tooltipRect.width - viewportPadding));
+
+  const anchorCenter = targetRect.left + (targetRect.width / 2);
+  const arrowLeft = Math.max(16, Math.min(tooltipRect.width - 16, anchorCenter - left));
+
+  tooltip.dataset.placement = placement;
+  tooltip.style.left = `${Math.round(left + window.scrollX)}px`;
+  tooltip.style.top = `${Math.round(top + window.scrollY)}px`;
+  tooltip.style.setProperty('--tooltip-arrow-left', `${Math.round(arrowLeft)}px`);
+}
+
+function showTooltip(target) {
+  const message = String(target.getAttribute('data-ui-tooltip') || '').trim();
+  if (!message) {
+    hideTooltip();
+    return;
+  }
+
+  const tooltip = ensureTooltipElement();
+  const content = tooltip.querySelector('.ui-tooltip__content');
+  content.textContent = message;
+
+  if (state.tooltipTarget && state.tooltipTarget !== target) {
+    state.tooltipTarget.removeAttribute('aria-describedby');
+  }
+
+  state.tooltipTarget = target;
+  target.setAttribute('aria-describedby', 'uiTooltip');
+  tooltip.classList.add('is-visible');
+  tooltip.setAttribute('aria-hidden', 'false');
+  positionTooltip();
+}
+
+function bindTooltipEvents() {
+  document.addEventListener('mouseover', (event) => {
+    const target = getTooltipTarget(event.target);
+    if (!target) {
+      return;
+    }
+
+    if (state.tooltipTarget === target) {
+      positionTooltip();
+      return;
+    }
+
+    showTooltip(target);
+  });
+
+  document.addEventListener('mouseout', (event) => {
+    const target = getTooltipTarget(event.target);
+    if (!target || state.tooltipTarget !== target) {
+      return;
+    }
+
+    const relatedTarget = getTooltipTarget(event.relatedTarget);
+    if (relatedTarget === target) {
+      return;
+    }
+
+    hideTooltip();
+  });
+
+  document.addEventListener('focusin', (event) => {
+    const target = getTooltipTarget(event.target);
+    if (target) {
+      showTooltip(target);
+    }
+  });
+
+  document.addEventListener('focusout', (event) => {
+    const target = getTooltipTarget(event.target);
+    if (!target || state.tooltipTarget !== target) {
+      return;
+    }
+
+    const relatedTarget = getTooltipTarget(event.relatedTarget);
+    if (relatedTarget === target) {
+      return;
+    }
+
+    hideTooltip();
+  });
+
+  document.addEventListener('pointerdown', hideTooltip, true);
+  window.addEventListener('scroll', positionTooltip, true);
+  window.addEventListener('resize', positionTooltip);
 }
 
 async function saveVehiclePatch(vehicleId, patch) {
@@ -275,7 +429,7 @@ function rowBadgeFormatter(cell) {
   const icons = [];
 
   if (isTop) {
-    icons.push('<span class="rec-icon" data-tooltip="Nasza rekomendacja" title="Nasza rekomendacja" aria-label="Nasza rekomendacja">★</span>');
+    icons.push('<span class="rec-icon" data-ui-tooltip="Nasza rekomendacja" aria-label="Nasza rekomendacja">★</span>');
   }
 
   if (Array.isArray(badges) && badges.length) {
@@ -284,7 +438,7 @@ function rowBadgeFormatter(cell) {
       const spaceIdx = str.indexOf(' ');
       const icon = spaceIdx > 0 ? str.slice(0, spaceIdx) : str;
       const label = spaceIdx > 0 ? str.slice(spaceIdx + 1) : str;
-      icons.push(`<span class="rec-icon" data-tooltip="${escapeHtml(label)}" title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}">${icon}</span>`);
+      icons.push(`<span class="rec-icon" data-ui-tooltip="${escapeHtml(label)}" aria-label="${escapeHtml(label)}">${icon}</span>`);
     }
   }
 
@@ -344,7 +498,7 @@ function configurationFormatter(cell) {
 
   const label = rowData.configurationSourceUrl ? 'Otwórz konfigurację' : 'Pobierz konfigurację';
   return `
-    <button class="config-action-button" type="button" aria-label="${label}" title="${label}">
+    <button class="config-action-button" type="button" aria-label="${label}" data-ui-tooltip="${escapeHtml(label)}">
       ${getEyeIcon()}
     </button>
   `;
@@ -968,7 +1122,7 @@ function packagesFormatter(cell) {
 function equipActionFormatter(cell) {
   const data = cell.getRow().getData();
   const count = (data.standardEquipment || []).length + (data.additionalEquipment || []).length;
-  return `<button class="equip-action-btn" type="button" title="Edytuj wyposażenie">✏️ ${count} poz.</button>`;
+  return `<button class="equip-action-btn" type="button" aria-label="Edytuj wyposażenie" data-ui-tooltip="Edytuj wyposażenie">✏️ ${count} poz.</button>`;
 }
 
 function priceCellFormatter(fieldPln, fieldEur) {
@@ -987,7 +1141,7 @@ function priceCellFormatter(fieldPln, fieldEur) {
       }
     }
 
-    const tooltip = tooltipParts.length ? ` title="${escapeHtml(tooltipParts.join(' • '))}"` : '';
+    const tooltip = tooltipParts.length ? ` data-ui-tooltip="${escapeHtml(tooltipParts.join(' • '))}"` : '';
     const secondaryLine = eurLabel
       ? `<span class="price-secondary"${tooltip}>${escapeHtml(eurLabel)}</span>`
       : '';
@@ -1383,6 +1537,8 @@ function renderColumnsDrawerContent() {
 
 
 function createTable(items) {
+  hideTooltip();
+
   if (state.table) {
     state.table.setColumns(getColumns());
     state.table.replaceData(items);
@@ -1966,6 +2122,7 @@ function bindEvents() {
 
 async function init() {
   bindEvents();
+  bindTooltipEvents();
 
   try {
     await loadCars();

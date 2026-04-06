@@ -901,7 +901,6 @@ button {
 }
 
 .rec-icon {
-  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -915,50 +914,11 @@ button {
   transition: background 0.15s, transform 0.15s var(--ease-eco), box-shadow 0.15s;
 }
 
-.rec-icon:hover {
+.rec-icon:hover,
+.rec-icon:focus-visible {
   background: var(--accent-soft);
   transform: translateY(-2px);
   box-shadow: 0 4px 14px rgba(5, 150, 105, 0.22);
-}
-
-.rec-icon::after {
-  content: attr(data-tooltip);
-  position: absolute;
-  bottom: calc(100% + 8px);
-  left: 50%;
-  transform: translateX(-50%);
-  white-space: nowrap;
-  background: var(--forest);
-  color: #fff;
-  padding: 6px 12px;
-  border-radius: var(--radius-sm);
-  font-size: 0.75rem;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.16s;
-  z-index: 9999;
-  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.22);
-}
-
-.rec-icon::before {
-  content: '';
-  position: absolute;
-  bottom: calc(100% + 3px);
-  left: 50%;
-  transform: translateX(-50%);
-  border: 5px solid transparent;
-  border-top-color: var(--forest);
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.16s;
-  z-index: 9999;
-}
-
-.rec-icon:hover::after,
-.rec-icon:hover::before {
-  opacity: 1;
 }
 
 .rec-empty {
@@ -966,10 +926,57 @@ button {
   font-weight: 700;
 }
 
-/* Recommendation cell needs overflow: visible for tooltip */
-.tabulator-cell:has(.rec-icons-row) {
-  overflow: visible !important;
-  z-index: 2;
+.ui-tooltip {
+  --tooltip-arrow-left: 50%;
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 4000;
+  max-width: min(280px, calc(100vw - 20px));
+  padding: 8px 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(18, 209, 146, 0.16);
+  background: linear-gradient(135deg, rgba(6, 78, 59, 0.98), rgba(10, 95, 71, 0.96));
+  color: #fff;
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1.4;
+  letter-spacing: 0.01em;
+  box-shadow:
+    0 10px 26px rgba(4, 30, 22, 0.24),
+    0 4px 14px rgba(4, 30, 22, 0.16);
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(4px) scale(0.98);
+  transition: opacity 0.14s var(--ease-smooth), transform 0.14s var(--ease-smooth);
+}
+
+.ui-tooltip.is-visible {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+.ui-tooltip__content {
+  position: relative;
+  z-index: 1;
+  overflow-wrap: anywhere;
+}
+
+.ui-tooltip__arrow {
+  position: absolute;
+  left: var(--tooltip-arrow-left);
+  width: 10px;
+  height: 10px;
+  background: #0a5f47;
+  transform: translateX(-50%) rotate(45deg);
+}
+
+.ui-tooltip[data-placement='top'] .ui-tooltip__arrow {
+  top: calc(100% - 5px);
+}
+
+.ui-tooltip[data-placement='bottom'] .ui-tooltip__arrow {
+  top: -5px;
 }
 
 /* === CONFIG ACTION BUTTON === */
