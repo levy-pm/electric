@@ -82,6 +82,10 @@ function isRetryableGeminiError(error) {
   const details = extractGeminiErrorDetails(error);
   const haystack = `${details.providerMessage} ${details.rawMessage} ${details.statusText}`.toLowerCase();
 
+  if (isQuotaExceededGeminiError(error)) {
+    return false;
+  }
+
   return (
     details.statusCode === 429 ||
     details.statusCode === 503 ||
@@ -96,7 +100,29 @@ function isRetryableGeminiError(error) {
   );
 }
 
+function isQuotaExceededGeminiError(error) {
+  const details = extractGeminiErrorDetails(error);
+  const haystack = `${details.providerMessage} ${details.rawMessage} ${details.statusText}`.toLowerCase();
+
+  return (
+    haystack.includes('quota exceeded') ||
+    haystack.includes('billing details') ||
+    haystack.includes('free_tier_requests') ||
+    haystack.includes('generaterequestsperdayperprojectpermodel-freetier') ||
+    haystack.includes('quota exceeded for metric')
+  );
+}
+
 function normalizeGeminiError(error) {
+  if (
+    error &&
+    typeof error === 'object' &&
+    Number.isFinite(error.statusCode) &&
+    typeof error.retryable === 'boolean'
+  ) {
+    return error;
+  }
+
   const details = extractGeminiErrorDetails(error);
   const normalized = new Error(details.providerMessage || 'Wystapil blad Gemini.');
   normalized.statusCode = details.statusCode || 502;
@@ -112,6 +138,13 @@ function normalizeGeminiError(error) {
     normalized.message = 'Plik analizy Gemini byl chwilowo niedostepny. Sprobuj ponownie za chwile.';
     normalized.statusCode = 503;
     normalized.retryable = true;
+    return normalized;
+  }
+
+  if (isQuotaExceededGeminiError(error)) {
+    normalized.message = 'Limit zapytan Gemini dla tego klucza API zostal osiagniety. To nie jest blad PDF-a. Sprobuj pozniej albo podmien klucz/plan.';
+    normalized.statusCode = 429;
+    normalized.retryable = false;
     return normalized;
   }
 
@@ -374,6 +407,7 @@ module.exports = {
   _internal: {
     analyzeUploadedPdf,
     extractGeminiErrorDetails,
+    isQuotaExceededGeminiError,
     isRetryableGeminiError,
     normalizeGeminiError,
     retryGeminiOperation,

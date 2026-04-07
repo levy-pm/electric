@@ -71,6 +71,33 @@ test('normalizeGeminiError marks transient Gemini file access errors as retryabl
   assert.match(normalized.message, /plik analizy gemini byl chwilowo niedostepny/i);
 });
 
+test('normalizeGeminiError reports quota exhaustion instead of overload', () => {
+  const providerError = new Error(
+    '{"error":{"code":429,"message":"Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 20, model: gemini-2.5-flash. Please check your plan and billing details.","status":"RESOURCE_EXHAUSTED"}}'
+  );
+  providerError.status = 429;
+
+  const normalized = _internal.normalizeGeminiError(providerError);
+
+  assert.equal(normalized.statusCode, 429);
+  assert.equal(normalized.retryable, false);
+  assert.match(normalized.message, /limit zapytan gemini/i);
+  assert.match(normalized.message, /to nie jest blad pdf-a/i);
+});
+
+test('normalizeGeminiError preserves an already normalized Gemini error', () => {
+  const error = new Error('Limit zapytan Gemini dla tego klucza API zostal osiagniety.');
+  error.statusCode = 429;
+  error.retryable = false;
+  error.providerMessage = 'Quota exceeded.';
+
+  const normalized = _internal.normalizeGeminiError(error);
+
+  assert.equal(normalized, error);
+  assert.equal(normalized.statusCode, 429);
+  assert.equal(normalized.retryable, false);
+});
+
 test('analyzeUploadedPdf deletes Gemini file only after extraction finishes', async () => {
   const events = [];
   let resolveExtraction;
