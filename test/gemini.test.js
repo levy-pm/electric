@@ -167,3 +167,15 @@ test('waitForUploadedFileReady polls Gemini file until it becomes ACTIVE', async
   assert.equal(getCalls, 2);
   assert.equal(sleepCalls, 2);
 });
+
+test('withTimeout returns fallback value when operation hangs', async () => {
+  const result = await _internal.withTimeout(
+    new Promise(() => {}),
+    {
+      timeoutMs: 1,
+      fallbackValue: [],
+    }
+  );
+
+  assert.deepEqual(result, []);
+});

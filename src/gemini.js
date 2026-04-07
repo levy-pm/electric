@@ -7,6 +7,35 @@ function delay(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+async function withTimeout(promise, options = {}) {
+  const timeoutMs = Math.max(0, options.timeoutMs || 0);
+  if (!timeoutMs) {
+    return promise;
+  }
+
+  let timeoutId = null;
+
+  try {
+    return await Promise.race([
+      Promise.resolve(promise),
+      new Promise((resolve, reject) => {
+        timeoutId = setTimeout(() => {
+          if (Object.prototype.hasOwnProperty.call(options, 'fallbackValue')) {
+            resolve(options.fallbackValue);
+            return;
+          }
+
+          reject(new Error(options.message || 'Operacja przekroczyla limit czasu.'));
+        }, timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
+  }
+}
+
 function safeJsonParse(rawValue) {
   try {
     return JSON.parse(rawValue);
@@ -302,13 +331,23 @@ async function findCombustionEquivalents(brand, model) {
   ].join(' ');
 
   try {
-    const response = await retryGeminiOperation(() => ai.models.generateContent({
-      model: config.geminiModel,
-      contents: prompt,
-      config: {
-        tools: [{ googleSearch: {} }],
-      },
-    }));
+    const response = await withTimeout(
+      retryGeminiOperation(() => ai.models.generateContent({
+        model: config.geminiModel,
+        contents: prompt,
+        config: {
+          tools: [{ googleSearch: {} }],
+        },
+      })),
+      {
+        timeoutMs: 15000,
+        fallbackValue: null,
+      }
+    );
+
+    if (!response) {
+      return [];
+    }
 
     const text = (response.text || '').trim();
     const match = text.match(/\[[\s\S]*?\]/);
@@ -339,5 +378,6 @@ module.exports = {
     normalizeGeminiError,
     retryGeminiOperation,
     waitForUploadedFileReady,
+    withTimeout,
   },
 };
