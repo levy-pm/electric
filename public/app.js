@@ -1901,13 +1901,59 @@ function closeImportModal() {
   }
 }
 
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function extractHtmlErrorMessage(rawText) {
+  const text = String(rawText || '').trim();
+  if (!text.startsWith('<')) {
+    return null;
+  }
+
+  const titleMatch = text.match(/<title>\s*([^<]+?)\s*<\/title>/i);
+  if (titleMatch) {
+    return titleMatch[1].trim();
+  }
+
+  const headingMatch =
+    text.match(/<h1[^>]*>\s*([^<]+?)\s*<\/h1>/i) ||
+    text.match(/<h2[^>]*>\s*([^<]+?)\s*<\/h2>/i);
+  return headingMatch ? headingMatch[1].trim() : 'Serwer zwrocil strone bledu zamiast odpowiedzi API.';
+}
+
+async function readApiPayload(response, fallbackMessage) {
+  const rawText = await response.text();
+  let payload = null;
+
+  if (rawText) {
+    try {
+      payload = JSON.parse(rawText);
+    } catch {
+      payload = null;
+    }
+  }
+
+  if (response.ok) {
+    return payload || {};
+  }
+
+  const htmlMessage = extractHtmlErrorMessage(rawText);
+  const error = new Error(
+    (payload && (payload.error || payload.message)) ||
+    htmlMessage ||
+    fallbackMessage ||
+    'Wystapil blad API.'
+  );
+  error.statusCode = response.status;
+  error.rawText = rawText;
+  error.payload = payload;
+  throw error;
+}
+
 async function loadCars() {
   const response = await fetch('/api/cars');
-  const payload = await response.json();
-
-  if (!response.ok) {
-    throw new Error(payload.error || 'Nie udało się pobrać tabeli.');
-  }
+  const payload = await readApiPayload(response, 'Nie udalo sie pobrac tabeli.');
 
   state.allItems = payload.items || [];
   state.summary = payload.summary || {};
@@ -1915,21 +1961,42 @@ async function loadCars() {
   renderColumnsDrawerContent();
 }
 
+async function waitForUploadCompletion(uploadId, fileName) {
+  const deadline = Date.now() + 15 * 60 * 1000;
+
+  while (Date.now() < deadline) {
+    const response = await fetch(`/api/uploads/${encodeURIComponent(uploadId)}/status`);
+    const payload = await readApiPayload(response, 'Nie udalo sie sprawdzic statusu importu.');
+
+    if (payload.status === 'completed') {
+      return {
+        message: payload.message || `Plik ${fileName} zostal odczytany i dodany do tabeli.`,
+        uploadId,
+        items: payload.items || [],
+      };
+    }
+
+    if (payload.status === 'failed') {
+      throw new Error(payload.error || `Nie udalo sie przetworzyc pliku ${fileName}.`);
+    }
+
+    updateImportStatus(`Plik ${fileName} zostal przyjety. Trwa analiza...`);
+    await delay(2500);
+  }
+
+  throw new Error('Analiza pliku trwa dluzej niz zwykle. Sprobuj ponownie za chwile.');
+}
+
 async function uploadFile(file) {
   const formData = new FormData();
   formData.append('configurationPdf', file);
 
-  const response = await fetch('/api/upload', {
+  const response = await fetch('/api/upload-async', {
     method: 'POST',
     body: formData,
   });
-  const payload = await response.json();
-
-  if (!response.ok) {
-    throw new Error(payload.error || 'Nie udało się przetworzyć PDF.');
-  }
-
-  return payload;
+  const payload = await readApiPayload(response, 'Nie udalo sie przyjac pliku PDF.');
+  return waitForUploadCompletion(payload.uploadId, file.name);
 }
 
 async function importUrl(url) {
@@ -1940,13 +2007,8 @@ async function importUrl(url) {
     },
     body: JSON.stringify({ url }),
   });
-  const payload = await response.json();
 
-  if (!response.ok) {
-    throw new Error(payload.error || 'Nie udało się przetworzyć linku.');
-  }
-
-  return payload;
+  return readApiPayload(response, 'Nie udalo sie przetworzyc linku.');
 }
 
 async function submitImport() {
