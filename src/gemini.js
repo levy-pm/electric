@@ -60,6 +60,8 @@ function isRetryableGeminiError(error) {
     haystack.includes('high demand') ||
     haystack.includes('try again later') ||
     haystack.includes('service unavailable') ||
+    haystack.includes('permission to access the file') ||
+    haystack.includes('may not exist') ||
     haystack.includes('resource_exhausted') ||
     haystack.includes('unavailable')
   );
@@ -72,6 +74,17 @@ function normalizeGeminiError(error) {
   normalized.retryable = false;
   normalized.providerMessage = details.providerMessage;
   normalized.cause = error;
+  const haystack = `${details.providerMessage} ${details.rawMessage} ${details.statusText}`.toLowerCase();
+
+  if (
+    haystack.includes('permission to access the file') ||
+    haystack.includes('may not exist')
+  ) {
+    normalized.message = 'Plik analizy Gemini byl chwilowo niedostepny. Sprobuj ponownie za chwile.';
+    normalized.statusCode = 503;
+    normalized.retryable = true;
+    return normalized;
+  }
 
   if (isRetryableGeminiError(error)) {
     normalized.message = 'Model analizy jest chwilowo przeciazony. Sprobuj ponownie za kilka minut.';
@@ -114,6 +127,41 @@ async function retryGeminiOperation(operation, options = {}) {
 function createGeminiClient() {
   validateConfig({ allowMissingGemini: false });
   return new GoogleGenAI({ apiKey: config.geminiApiKey });
+}
+
+async function waitForUploadedFileReady(ai, uploadedFile, options = {}) {
+  const sleep = options.sleep || delay;
+  const pollIntervalMs = Math.max(0, options.pollIntervalMs || 5000);
+  const maxAttempts = Math.max(1, options.maxAttempts || 24);
+  let currentFile = uploadedFile;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    const state = String((currentFile && currentFile.state) || '').toUpperCase();
+
+    if (!state || state === 'ACTIVE') {
+      return currentFile;
+    }
+
+    if (state === 'FAILED') {
+      const errorMessage =
+        currentFile &&
+        currentFile.error &&
+        typeof currentFile.error.message === 'string' &&
+        currentFile.error.message.trim()
+          ? currentFile.error.message.trim()
+          : 'Przetwarzanie pliku PDF przez Gemini nie powiodlo sie.';
+      throw new Error(errorMessage);
+    }
+
+    if (!currentFile || !currentFile.name || attempt >= maxAttempts) {
+      throw new Error('Przetwarzanie pliku PDF przez Gemini trwa zbyt dlugo. Sprobuj ponownie za chwile.');
+    }
+
+    await sleep(pollIntervalMs);
+    currentFile = await ai.files.get({ name: currentFile.name });
+  }
+
+  throw new Error('Przetwarzanie pliku PDF przez Gemini trwa zbyt dlugo. Sprobuj ponownie za chwile.');
 }
 
 function buildPdfPrompt(originalName) {
@@ -196,6 +244,24 @@ async function generateVehicleExtraction(contents) {
   };
 }
 
+async function analyzeUploadedPdf(ai, uploadedFile, originalName, generateExtraction = generateVehicleExtraction) {
+  try {
+    const readyFile = await waitForUploadedFileReady(ai, uploadedFile);
+    const result = await generateExtraction(
+      createUserContent([
+        createPartFromUri(readyFile.uri || uploadedFile.uri, readyFile.mimeType || uploadedFile.mimeType),
+        buildPdfPrompt(originalName),
+      ])
+    );
+
+    return result;
+  } finally {
+    if (uploadedFile && uploadedFile.name) {
+      await ai.files.delete({ name: uploadedFile.name }).catch(() => {});
+    }
+  }
+}
+
 async function extractVehicleFromPdf(filePath, originalName) {
   return retryGeminiOperation(async () => {
     const ai = createGeminiClient();
@@ -207,18 +273,7 @@ async function extractVehicleFromPdf(filePath, originalName) {
       },
     });
 
-    try {
-      return generateVehicleExtraction(
-        createUserContent([
-          createPartFromUri(uploadedFile.uri, uploadedFile.mimeType),
-          buildPdfPrompt(originalName),
-        ])
-      );
-    } finally {
-      if (uploadedFile && uploadedFile.name) {
-        await ai.files.delete({ name: uploadedFile.name }).catch(() => {});
-      }
-    }
+    return analyzeUploadedPdf(ai, uploadedFile, originalName);
   });
 }
 
@@ -278,9 +333,11 @@ module.exports = {
   extractVehicleFromSourceText,
   findCombustionEquivalents,
   _internal: {
+    analyzeUploadedPdf,
     extractGeminiErrorDetails,
     isRetryableGeminiError,
     normalizeGeminiError,
     retryGeminiOperation,
+    waitForUploadedFileReady,
   },
 };
