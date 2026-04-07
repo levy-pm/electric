@@ -56,7 +56,9 @@ function extractGeminiErrorDetails(error) {
     safeJsonParse(fallbackMessage);
   const payload = parsed && parsed.error ? parsed.error : parsed;
   const providerMessage =
-    payload && typeof payload.message === 'string' && payload.message.trim()
+    error && typeof error.providerMessage === 'string' && error.providerMessage.trim()
+      ? error.providerMessage.trim()
+      : payload && typeof payload.message === 'string' && payload.message.trim()
       ? payload.message.trim()
       : fallbackMessage;
   const statusCode =
@@ -186,9 +188,60 @@ async function retryGeminiOperation(operation, options = {}) {
   throw lastError || new Error('Wystapil blad Gemini.');
 }
 
-function createGeminiClient() {
-  validateConfig({ allowMissingGemini: false });
-  return new GoogleGenAI({ apiKey: config.geminiApiKey });
+function createGeminiClient(apiKey = config.geminiApiKey) {
+  const resolvedApiKey = String(apiKey || '').trim();
+  if (!resolvedApiKey) {
+    validateConfig({ allowMissingGemini: false });
+    throw new Error('Brakuje GEMINI_API_KEY lub GEMINI_API_KEYS.');
+  }
+
+  return new GoogleGenAI({ apiKey: resolvedApiKey });
+}
+
+function getGeminiApiKeys(options = {}) {
+  const configuredKeys = Array.isArray(options.apiKeys) ? options.apiKeys : config.geminiApiKeys;
+  const apiKeys = [...new Set((configuredKeys || []).map((value) => String(value || '').trim()).filter(Boolean))];
+
+  if (apiKeys.length === 0) {
+    validateConfig({ allowMissingGemini: false });
+    throw new Error('Brakuje GEMINI_API_KEY lub GEMINI_API_KEYS.');
+  }
+
+  return apiKeys;
+}
+
+function shouldFallbackToNextGeminiKey(error) {
+  return isQuotaExceededGeminiError(error) || normalizeGeminiError(error).retryable;
+}
+
+async function runGeminiOperationAcrossKeys(operation, options = {}) {
+  const apiKeys = getGeminiApiKeys(options);
+  const createClient = options.createClient || createGeminiClient;
+  const retryOptions = options.retryOptions || {};
+  let lastError = null;
+
+  for (let keyIndex = 0; keyIndex < apiKeys.length; keyIndex += 1) {
+    const apiKey = apiKeys[keyIndex];
+    const ai = createClient(apiKey);
+
+    try {
+      return await retryGeminiOperation(
+        () => operation(ai, { apiKey, keyIndex, totalKeys: apiKeys.length }),
+        retryOptions
+      );
+    } catch (error) {
+      const normalized = normalizeGeminiError(error);
+      lastError = normalized;
+
+      if (keyIndex < apiKeys.length - 1 && shouldFallbackToNextGeminiKey(normalized)) {
+        continue;
+      }
+
+      throw normalized;
+    }
+  }
+
+  throw lastError || new Error('Wystapil blad Gemini.');
 }
 
 async function waitForUploadedFileReady(ai, uploadedFile, options = {}) {
@@ -274,9 +327,8 @@ function buildTextPrompt(sourceLabel, sourceText) {
   ].join('\n\n');
 }
 
-async function generateVehicleExtraction(contents) {
-  const ai = createGeminiClient();
-  const response = await retryGeminiOperation(() => ai.models.generateContent({
+async function generateVehicleExtractionWithClient(ai, contents) {
+  const response = await ai.models.generateContent({
     model: config.geminiModel,
     contents,
     config: {
@@ -284,7 +336,7 @@ async function generateVehicleExtraction(contents) {
       responseMimeType: 'application/json',
       responseJsonSchema: geminiVehicleResponseJsonSchema,
     },
-  }));
+  });
 
   const rawText = (response && response.text ? response.text : '').trim();
   if (!rawText) {
@@ -306,7 +358,16 @@ async function generateVehicleExtraction(contents) {
   };
 }
 
-async function analyzeUploadedPdf(ai, uploadedFile, originalName, generateExtraction = generateVehicleExtraction) {
+async function generateVehicleExtraction(contents) {
+  return runGeminiOperationAcrossKeys((ai) => generateVehicleExtractionWithClient(ai, contents));
+}
+
+async function analyzeUploadedPdf(
+  ai,
+  uploadedFile,
+  originalName,
+  generateExtraction = (contents) => generateVehicleExtractionWithClient(ai, contents)
+) {
   try {
     const readyFile = await waitForUploadedFileReady(ai, uploadedFile);
     const result = await generateExtraction(
@@ -325,8 +386,7 @@ async function analyzeUploadedPdf(ai, uploadedFile, originalName, generateExtrac
 }
 
 async function extractVehicleFromPdf(filePath, originalName) {
-  return retryGeminiOperation(async () => {
-    const ai = createGeminiClient();
+  return runGeminiOperationAcrossKeys(async (ai) => {
     const uploadedFile = await ai.files.upload({
       file: filePath,
       config: {
@@ -345,15 +405,15 @@ async function extractVehicleFromSourceText(sourceLabel, sourceText) {
     throw new Error('Brak tresci do analizy.');
   }
 
-  return generateVehicleExtraction(buildTextPrompt(sourceLabel, trimmedText));
+  return runGeminiOperationAcrossKeys((ai) =>
+    generateVehicleExtractionWithClient(ai, buildTextPrompt(sourceLabel, trimmedText))
+  );
 }
 
 async function findCombustionEquivalents(brand, model) {
   if (!brand && !model) {
     return [];
   }
-
-  const ai = createGeminiClient();
 
   const carName = [brand, model].filter(Boolean).join(' ');
   const prompt = [
@@ -364,18 +424,20 @@ async function findCombustionEquivalents(brand, model) {
   ].join(' ');
 
   try {
-    const response = await withTimeout(
-      retryGeminiOperation(() => ai.models.generateContent({
-        model: config.geminiModel,
-        contents: prompt,
-        config: {
-          tools: [{ googleSearch: {} }],
-        },
-      })),
-      {
-        timeoutMs: 15000,
-        fallbackValue: null,
-      }
+    const response = await runGeminiOperationAcrossKeys((ai) =>
+      withTimeout(
+        ai.models.generateContent({
+          model: config.geminiModel,
+          contents: prompt,
+          config: {
+            tools: [{ googleSearch: {} }],
+          },
+        }),
+        {
+          timeoutMs: 15000,
+          fallbackValue: null,
+        }
+      )
     );
 
     if (!response) {
@@ -407,9 +469,12 @@ module.exports = {
   _internal: {
     analyzeUploadedPdf,
     extractGeminiErrorDetails,
+    getGeminiApiKeys,
     isQuotaExceededGeminiError,
     isRetryableGeminiError,
     normalizeGeminiError,
+    runGeminiOperationAcrossKeys,
+    shouldFallbackToNextGeminiKey,
     retryGeminiOperation,
     waitForUploadedFileReady,
     withTimeout,

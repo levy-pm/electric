@@ -1,7 +1,27 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
+const { parseGeminiApiKeys } = require('../src/config');
 const { _internal } = require('../src/gemini');
+
+test('parseGeminiApiKeys prefers comma-separated pool over legacy single key envs', () => {
+  const result = parseGeminiApiKeys({
+    GEMINI_API_KEYS: ' key-1 , key-2 , key-1 ,, key-3 ',
+    GEMINI_API_KEY: 'legacy-key',
+    GOOGLE_API_KEY: 'google-key',
+  });
+
+  assert.deepEqual(result, ['key-1', 'key-2', 'key-3']);
+});
+
+test('parseGeminiApiKeys falls back to legacy single key envs when pool is missing', () => {
+  const result = parseGeminiApiKeys({
+    GEMINI_API_KEY: 'legacy-key',
+    GOOGLE_API_KEY: 'google-key',
+  });
+
+  assert.deepEqual(result, ['legacy-key', 'google-key']);
+});
 
 test('normalizeGeminiError converts provider 503 high-demand payload into a friendly retryable message', () => {
   const providerError = new Error('{"error":{"code":503,"message":"This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.","status":"UNAVAILABLE"}}');
@@ -96,6 +116,61 @@ test('normalizeGeminiError preserves an already normalized Gemini error', () => 
   assert.equal(normalized, error);
   assert.equal(normalized.statusCode, 429);
   assert.equal(normalized.retryable, false);
+});
+
+test('runGeminiOperationAcrossKeys switches to the next key after quota exhaustion', async () => {
+  const attempts = [];
+
+  const result = await _internal.runGeminiOperationAcrossKeys(
+    async (ai) => {
+      attempts.push(ai.apiKey);
+
+      if (ai.apiKey === 'key-1') {
+        const error = new Error(
+          '{"error":{"code":429,"message":"Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests.","status":"RESOURCE_EXHAUSTED"}}'
+        );
+        error.status = 429;
+        throw error;
+      }
+
+      return 'ok';
+    },
+    {
+      apiKeys: ['key-1', 'key-2', 'key-3'],
+      createClient: (apiKey) => ({ apiKey }),
+      retryOptions: {
+        maxAttempts: 1,
+      },
+    }
+  );
+
+  assert.equal(result, 'ok');
+  assert.deepEqual(attempts, ['key-1', 'key-2']);
+});
+
+test('runGeminiOperationAcrossKeys does not move to the next key for non-key-related errors', async () => {
+  const attempts = [];
+
+  await assert.rejects(
+    () => _internal.runGeminiOperationAcrossKeys(
+      async (ai) => {
+        attempts.push(ai.apiKey);
+        const error = new Error('Nieprawidlowy format odpowiedzi.');
+        error.status = 400;
+        throw error;
+      },
+      {
+        apiKeys: ['key-1', 'key-2'],
+        createClient: (apiKey) => ({ apiKey }),
+        retryOptions: {
+          maxAttempts: 1,
+        },
+      }
+    ),
+    /Nieprawidlowy format odpowiedzi/
+  );
+
+  assert.deepEqual(attempts, ['key-1']);
 });
 
 test('analyzeUploadedPdf deletes Gemini file only after extraction finishes', async () => {

@@ -33,6 +33,7 @@ DB_PORT=3306
 DB_NAME=
 DB_USER=
 DB_PASSWORD=
+GEMINI_API_KEYS=
 GEMINI_API_KEY=
 GEMINI_MODEL=gemini-2.5-flash
 GEMINI_BUSY_RETRY_ATTEMPTS=3
@@ -42,6 +43,8 @@ NBP_REQUEST_TIMEOUT_MS=8000
 MAX_FILE_SIZE_MB=20
 SYNC_BRANCH=main
 ```
+
+`GEMINI_API_KEYS` przyjmuje liste kluczy rozdzielonych przecinkami i ma priorytet nad pojedynczym `GEMINI_API_KEY`. Aplikacja probuje klucze po kolei, gdy poprzedni dostanie limit albo powtarzajace sie bledy `429/503`.
 
 ## Uruchomienie lokalne
 
@@ -105,7 +108,7 @@ npm run deploy:sync
 
 `GET /api/cars` wzbogaca rekordy o kurs EUR z NBP i pola `totalPriceEur` / `basePriceEur`.
 
-Import PDF automatycznie ponawia chwilowe bledy `503/UNAVAILABLE` z Gemini. Limity ponowien ustawisz przez `GEMINI_BUSY_RETRY_ATTEMPTS` i `GEMINI_BUSY_RETRY_BASE_DELAY_MS`.
+Import PDF automatycznie ponawia chwilowe bledy `503/UNAVAILABLE` z Gemini. Gdy ustawisz `GEMINI_API_KEYS`, po wyczerpaniu limitu albo przeciążeniu jednego klucza aplikacja przejdzie do kolejnego. Limity ponowien ustawisz przez `GEMINI_BUSY_RETRY_ATTEMPTS` i `GEMINI_BUSY_RETRY_BASE_DELAY_MS`.
 
 ## Logika rekomendacji
 

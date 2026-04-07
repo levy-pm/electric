@@ -242,6 +242,10 @@ async function createApp() {
       ok: true,
       mode: config.dbMode,
       time: new Date().toISOString(),
+      gemini: {
+        model: config.geminiModel,
+        keyPoolSize: config.geminiApiKeys.length,
+      },
       deploy: readDeployMeta(),
     });
   });
@@ -252,6 +256,7 @@ async function createApp() {
       dbMode: config.dbMode,
       maxFileSizeMb: config.maxFileSizeMb,
       geminiModel: config.geminiModel,
+      geminiKeyPoolSize: config.geminiApiKeys.length,
     });
   });
 

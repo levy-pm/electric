@@ -11,6 +11,17 @@ function toInt(value, fallback) {
   return Number.isNaN(parsed) ? fallback : parsed;
 }
 
+function parseGeminiApiKeys(env = process.env) {
+  const multiValue = String(env.GEMINI_API_KEYS || '').trim();
+  const rawKeys = multiValue
+    ? multiValue.split(',')
+    : [env.GEMINI_API_KEY, env.GOOGLE_API_KEY];
+
+  return [...new Set(rawKeys.map((value) => String(value || '').trim()).filter(Boolean))];
+}
+
+const geminiApiKeys = parseGeminiApiKeys();
+
 const config = {
   rootDir,
   appName: 'electric',
@@ -23,7 +34,8 @@ const config = {
   dbName: process.env.DB_NAME || '',
   dbUser: process.env.DB_USER || '',
   dbPassword: process.env.DB_PASSWORD || '',
-  geminiApiKey: process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '',
+  geminiApiKeys,
+  geminiApiKey: geminiApiKeys[0] || '',
   geminiModel: process.env.GEMINI_MODEL || 'gemini-2.5-flash',
   geminiBusyRetryAttempts: toInt(process.env.GEMINI_BUSY_RETRY_ATTEMPTS, 3),
   geminiBusyRetryBaseDelayMs: toInt(process.env.GEMINI_BUSY_RETRY_BASE_DELAY_MS, 5000),
@@ -53,8 +65,8 @@ function validateConfig(options = {}) {
     }
   }
 
-  if (!allowMissingGemini && !config.geminiApiKey) {
-    throw new Error('Brakuje GEMINI_API_KEY.');
+  if (!allowMissingGemini && config.geminiApiKeys.length === 0) {
+    throw new Error('Brakuje GEMINI_API_KEY lub GEMINI_API_KEYS.');
   }
 
   return config;
@@ -62,5 +74,6 @@ function validateConfig(options = {}) {
 
 module.exports = {
   config,
+  parseGeminiApiKeys,
   validateConfig,
 };
