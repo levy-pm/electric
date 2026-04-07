@@ -35,6 +35,8 @@ DB_USER=
 DB_PASSWORD=
 GEMINI_API_KEY=
 GEMINI_MODEL=gemini-2.5-flash
+GEMINI_BUSY_RETRY_ATTEMPTS=3
+GEMINI_BUSY_RETRY_BASE_DELAY_MS=5000
 NBP_CACHE_TTL_MINUTES=720
 NBP_REQUEST_TIMEOUT_MS=8000
 MAX_FILE_SIZE_MB=20
@@ -102,6 +104,8 @@ npm run deploy:sync
 - `GET /healthz` - prosty healthcheck + status ostatniego deploya
 
 `GET /api/cars` wzbogaca rekordy o kurs EUR z NBP i pola `totalPriceEur` / `basePriceEur`.
+
+Import PDF automatycznie ponawia chwilowe bledy `503/UNAVAILABLE` z Gemini. Limity ponowien ustawisz przez `GEMINI_BUSY_RETRY_ATTEMPTS` i `GEMINI_BUSY_RETRY_BASE_DELAY_MS`.
 
 ## Logika rekomendacji
 

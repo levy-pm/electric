@@ -25,6 +25,8 @@ const config = {
   dbPassword: process.env.DB_PASSWORD || '',
   geminiApiKey: process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '',
   geminiModel: process.env.GEMINI_MODEL || 'gemini-2.5-flash',
+  geminiBusyRetryAttempts: toInt(process.env.GEMINI_BUSY_RETRY_ATTEMPTS, 3),
+  geminiBusyRetryBaseDelayMs: toInt(process.env.GEMINI_BUSY_RETRY_BASE_DELAY_MS, 5000),
   uploadDir: process.env.UPLOAD_DIR || path.join(rootDir, 'storage', 'uploads'),
   logsDir: path.join(rootDir, 'storage', 'logs'),
   maxFileSizeMb: toInt(process.env.MAX_FILE_SIZE_MB, 20),
