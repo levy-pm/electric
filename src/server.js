@@ -425,6 +425,83 @@ async function createApp() {
     });
   }));
 
+  app.post('/api/manual', uploadLimiter, asyncRoute(async (req, res) => {
+    const body = req.body || {};
+
+    const brand = normalizeOptionalText(body.brand);
+    const model = normalizeOptionalText(body.model);
+    if (!brand && !model) {
+      res.status(400).json({ error: 'Podaj markę lub model pojazdu.' });
+      return;
+    }
+
+    const totalPricePln = normalizeOptionalNumber('totalPricePln', body.totalPricePln);
+    const rangeWltpKm = normalizeOptionalNumber('rangeWltpKm', body.rangeWltpKm);
+    const batteryCapacityKwh = normalizeOptionalNumber('batteryCapacityKwh', body.batteryCapacityKwh);
+    const powerHp = normalizeOptionalNumber('powerHp', body.powerHp);
+    const energyConsumptionKwh100km = normalizeOptionalNumber('energyConsumptionKwh100km', body.energyConsumptionKwh100km);
+
+    const displayName = [brand, model, normalizeOptionalText(body.versionName)].filter(Boolean).join(' ') || 'Ręczna konfiguracja';
+
+    const uploadEntry = await store.createUpload({
+      sourceType: 'manual',
+      sourceUrl: null,
+      originalName: displayName,
+      storedName: '',
+      mimeType: 'application/json',
+      sizeBytes: 0,
+    });
+
+    const vehicle = {
+      brand,
+      model,
+      versionName: normalizeOptionalText(body.versionName),
+      displayName,
+      currency: 'PLN',
+      basePricePln: totalPricePln,
+      totalPricePln,
+      powerKw: null,
+      powerHp,
+      torqueNm: null,
+      rangeWltpKm,
+      batteryCapacityKwh,
+      energyConsumptionKwh100km,
+      seats: null,
+      fuelType: 'BEV',
+      homologationStandard: null,
+      co2EmissionGkm: null,
+      technicalType: null,
+      exteriorColor: normalizeOptionalText(body.exteriorColor),
+      exteriorColorPricePln: null,
+      wheels: null,
+      wheelsPricePln: null,
+      interiorTrim: null,
+      interiorPricePln: null,
+      additionalEquipment: [],
+      standardEquipment: [],
+      equipmentPackages: [],
+      configurationCode: null,
+      sourceDate: new Date().toISOString().split('T')[0],
+      notes: [],
+      warnings: [],
+      combustionEquivalents: [],
+      equipmentScore: 0,
+      createdAt: new Date().toISOString(),
+    };
+
+    await store.markUploadCompleted(uploadEntry.id, [vehicle]);
+
+    const rateInfo = await getEurExchangeRate();
+    const vehicles = await store.listVehicles();
+    const allItems = vehicles.map((v) => toClientVehicle(v, rateInfo));
+
+    res.status(201).json({
+      message: `${displayName} został dodany do tabeli.`,
+      uploadId: uploadEntry.id,
+      items: allItems,
+    });
+  }));
+
   app.post('/api/import-url', uploadLimiter, asyncRoute(async (req, res) => {
     const sourceUrl = String(req.body && req.body.url ? req.body.url : '').trim();
     if (!sourceUrl) {
@@ -456,6 +533,19 @@ async function createApp() {
       });
     } catch (error) {
       throw error;
+    }
+  }));
+
+  app.delete('/api/vehicles/:id', asyncRoute(async (req, res) => {
+    try {
+      await store.deleteVehicle(req.params.id);
+      res.json({ message: 'Konfiguracja została usunięta.' });
+    } catch (error) {
+      if (error.code === 'NOT_FOUND') {
+        res.status(404).json({ error: 'Nie znaleziono pojazdu.' });
+      } else {
+        throw error;
+      }
     }
   }));
 

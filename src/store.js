@@ -622,6 +622,27 @@ async function listEquipmentFacets() {
   }));
 }
 
+async function deleteVehicle(vehicleId) {
+  if (config.dbMode === 'memory') {
+    if (!memoryState.vehicles.has(vehicleId)) {
+      const err = new Error('NOT_FOUND');
+      err.code = 'NOT_FOUND';
+      throw err;
+    }
+    memoryState.vehicles.delete(vehicleId);
+    memoryState.vehicleEquipment.delete(vehicleId);
+    return;
+  }
+
+  const db = await initMariaDbPool();
+  const [result] = await db.execute(`DELETE FROM vehicles WHERE id = ?`, [vehicleId]);
+  if (result.affectedRows === 0) {
+    const err = new Error('NOT_FOUND');
+    err.code = 'NOT_FOUND';
+    throw err;
+  }
+}
+
 module.exports = {
   initStore,
   createUpload,
@@ -632,4 +653,5 @@ module.exports = {
   getUploadById,
   getVehicleById,
   updateVehicle,
+  deleteVehicle,
 };

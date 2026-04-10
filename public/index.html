@@ -158,6 +158,9 @@
           <button id="importUrlTab" class="tab-button" type="button" data-import-tab="url">
             Wklej link
           </button>
+          <button id="importManualTab" class="tab-button" type="button" data-import-tab="manual">
+            Ręcznie
+          </button>
         </div>
 
         <div id="importFilePanel" class="modal-tab-panel is-active">
@@ -182,6 +185,48 @@
           <p class="field-hint">
             Obecnie obsługujemy linki z Honda, Ford i bezpośrednie PDF-y. Wklej adres URL ze swojego przeglądarki.
           </p>
+        </div>
+
+        <div id="importManualPanel" class="modal-tab-panel" hidden>
+          <div class="manual-form-grid">
+            <label class="field">
+              <span>Marka <span class="field-required">*</span></span>
+              <input id="manualBrand" type="text" placeholder="np. Kia" autocomplete="off" />
+            </label>
+            <label class="field">
+              <span>Model <span class="field-required">*</span></span>
+              <input id="manualModel" type="text" placeholder="np. EV3" autocomplete="off" />
+            </label>
+            <label class="field">
+              <span>Wersja</span>
+              <input id="manualVersion" type="text" placeholder="np. Standard Range" autocomplete="off" />
+            </label>
+            <label class="field">
+              <span>Kolor</span>
+              <input id="manualColor" type="text" placeholder="np. Czarny metalik" autocomplete="off" />
+            </label>
+            <label class="field">
+              <span>Cena końcowa (zł)</span>
+              <input id="manualPrice" type="number" min="0" step="1" placeholder="np. 219900" />
+            </label>
+            <label class="field">
+              <span>Zasięg WLTP (km)</span>
+              <input id="manualRange" type="number" min="0" step="1" placeholder="np. 563" />
+            </label>
+            <label class="field">
+              <span>Bateria (kWh)</span>
+              <input id="manualBattery" type="number" min="0" step="0.1" placeholder="np. 81.4" />
+            </label>
+            <label class="field">
+              <span>Moc (KM)</span>
+              <input id="manualPower" type="number" min="0" step="1" placeholder="np. 204" />
+            </label>
+            <label class="field">
+              <span>Zużycie energii (kWh/100 km)</span>
+              <input id="manualConsumption" type="number" min="0" step="0.1" placeholder="np. 14.3" />
+            </label>
+          </div>
+          <p class="field-hint">Pola oznaczone <span class="field-required">*</span> są wymagane.</p>
         </div>
 
         <div id="importModalStatus" class="modal-status" aria-live="polite"></div>
@@ -223,6 +268,42 @@
           <button id="cancelEquipmentButton" class="secondary-button" type="button">Anuluj</button>
           <button id="saveEquipmentButton" class="primary-button" type="button">Zapisz</button>
         </div>
+      </div>
+    </div>
+
+    <!-- Modal potwierdzenia usunięcia -->
+    <div id="deleteModal" class="modal" aria-hidden="true">
+      <div class="modal-backdrop" data-close-delete-modal="true"></div>
+      <div class="modal-panel modal-panel--narrow" role="dialog" aria-modal="true" aria-labelledby="deleteModalTitle">
+        <div class="modal-header">
+          <div>
+            <span class="eyebrow">⚠️ Uwaga</span>
+            <h2 id="deleteModalTitle">Usuń konfigurację</h2>
+          </div>
+          <button id="closeDeleteButton" class="icon-button" type="button" aria-label="Zamknij">×</button>
+        </div>
+        <p id="deleteModalBody" class="delete-modal-body">
+          Ta akcja jest nieodwracalna. Konfiguracja zostanie trwale usunięta z bazy danych.
+        </p>
+        <div class="modal-actions">
+          <button id="cancelDeleteButton" class="secondary-button" type="button">Anuluj</button>
+          <button id="confirmDeleteButton" class="danger-button" type="button">Usuń</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal podglądu konfiguracji -->
+    <div id="previewModal" class="modal" aria-hidden="true">
+      <div class="modal-backdrop" data-close-preview-modal="true"></div>
+      <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="previewModalTitle">
+        <div class="modal-header">
+          <div>
+            <span class="eyebrow">👁 Podgląd konfiguracji</span>
+            <h2 id="previewModalTitle">Szczegóły</h2>
+          </div>
+          <button id="closePreviewButton" class="icon-button" type="button" aria-label="Zamknij">×</button>
+        </div>
+        <div id="previewModalBody" class="preview-body"></div>
       </div>
     </div>
 

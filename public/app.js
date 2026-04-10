@@ -1404,7 +1404,27 @@ function getColumns() {
       ...definition,
       ...editableOverrides[definition.field],
     };
-  });
+  }).concat([{
+    title: 'Akcje',
+    field: '_actions',
+    minWidth: 90,
+    width: 90,
+    widthGrow: 0,
+    hozAlign: 'center',
+    headerSort: false,
+    resizable: false,
+    formatter: () => `<div class="action-btns">
+        <button class="action-btn action-btn--view" data-action="view" title="Podgląd" aria-label="Podgląd">👁</button>
+        <button class="action-btn action-btn--delete" data-action="delete" title="Usuń" aria-label="Usuń">🗑</button>
+      </div>`,
+    cellClick: (e, cell) => {
+      const action = e.target.closest('[data-action]')?.getAttribute('data-action');
+      if (!action) return;
+      const rowData = cell.getRow().getData();
+      if (action === 'view') openPreviewModal(rowData);
+      if (action === 'delete') openDeleteModal(rowData);
+    },
+  }]);
 }
 
 function saveColumnLayout() {
@@ -1870,15 +1890,18 @@ function closeDrawer() {
 }
 
 function setImportMode(mode) {
-  state.importMode = mode === 'url' ? 'url' : 'file';
+  state.importMode = ['url', 'manual'].includes(mode) ? mode : 'file';
 
-  const isFile = state.importMode === 'file';
-  document.getElementById('importFileTab').classList.toggle('is-active', isFile);
-  document.getElementById('importUrlTab').classList.toggle('is-active', !isFile);
-  document.getElementById('importFilePanel').hidden = !isFile;
-  document.getElementById('importFilePanel').classList.toggle('is-active', isFile);
-  document.getElementById('importUrlPanel').hidden = isFile;
-  document.getElementById('importUrlPanel').classList.toggle('is-active', !isFile);
+  document.getElementById('importFileTab').classList.toggle('is-active', state.importMode === 'file');
+  document.getElementById('importUrlTab').classList.toggle('is-active', state.importMode === 'url');
+  document.getElementById('importManualTab').classList.toggle('is-active', state.importMode === 'manual');
+
+  document.getElementById('importFilePanel').hidden = state.importMode !== 'file';
+  document.getElementById('importFilePanel').classList.toggle('is-active', state.importMode === 'file');
+  document.getElementById('importUrlPanel').hidden = state.importMode !== 'url';
+  document.getElementById('importUrlPanel').classList.toggle('is-active', state.importMode === 'url');
+  document.getElementById('importManualPanel').hidden = state.importMode !== 'manual';
+  document.getElementById('importManualPanel').classList.toggle('is-active', state.importMode === 'manual');
 }
 
 function resetImportForm() {
@@ -1886,6 +1909,9 @@ function resetImportForm() {
   document.getElementById('modalUploadInput').value = '';
   document.getElementById('configurationUrlInput').value = '';
   document.getElementById('selectedFileName').textContent = 'Nie wybrano plikow.';
+  ['manualBrand', 'manualModel', 'manualVersion', 'manualColor',
+   'manualPrice', 'manualRange', 'manualBattery', 'manualPower', 'manualConsumption']
+    .forEach((id) => { document.getElementById(id).value = ''; });
   updateImportStatus('');
   setImportMode('file');
 }
@@ -2104,22 +2130,150 @@ async function submitImportBatch() {
       return;
     }
 
-    const url = document.getElementById('configurationUrlInput').value.trim();
-    if (!url) {
-      throw new Error('Wklej link do konfiguracji.');
+    if (state.importMode === 'url') {
+      const url = document.getElementById('configurationUrlInput').value.trim();
+      if (!url) {
+        throw new Error('Wklej link do konfiguracji.');
+      }
+
+      updateImportStatus('Analizuje link do konfiguracji...');
+      const payload = await importUrl(url);
+
+      closeImportModal();
+      updateStatus(payload.message || 'Konfiguracja zostala dodana.');
+      await loadCars();
+      return;
     }
 
-    updateImportStatus('Analizuje link do konfiguracji...');
-    const payload = await importUrl(url);
+    // Ręczny wpis
+    const brand = document.getElementById('manualBrand').value.trim();
+    const model = document.getElementById('manualModel').value.trim();
+    if (!brand && !model) {
+      throw new Error('Podaj markę lub model pojazdu.');
+    }
+
+    updateImportStatus('Zapisuję konfigurację...');
+    const response = await fetch('/api/manual', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        brand: brand || null,
+        model: model || null,
+        versionName: document.getElementById('manualVersion').value.trim() || null,
+        exteriorColor: document.getElementById('manualColor').value.trim() || null,
+        totalPricePln: document.getElementById('manualPrice').value || null,
+        rangeWltpKm: document.getElementById('manualRange').value || null,
+        batteryCapacityKwh: document.getElementById('manualBattery').value || null,
+        powerHp: document.getElementById('manualPower').value || null,
+        energyConsumptionKwh100km: document.getElementById('manualConsumption').value || null,
+      }),
+    });
+    const payload = await readApiPayload(response, 'Nie udało się zapisać konfiguracji.');
 
     closeImportModal();
-    updateStatus(payload.message || 'Konfiguracja zostala dodana.');
+    updateStatus(payload.message || 'Konfiguracja została dodana.');
     await loadCars();
   } catch (error) {
     updateImportStatus(error.message, true);
   } finally {
     confirmButton.disabled = false;
   }
+}
+
+// ---------------------------------------------------------------------------
+// Modal usunięcia
+// ---------------------------------------------------------------------------
+
+let _pendingDeleteId = null;
+
+function openDeleteModal(rowData) {
+  const name = [rowData.brand, rowData.model].filter(Boolean).join(' ') || rowData.displayName || 'tę konfigurację';
+  _pendingDeleteId = rowData.id;
+  document.getElementById('deleteModalBody').textContent =
+    `Czy na pewno chcesz usunąć „${name}"? Tej operacji nie można cofnąć.`;
+  const modal = document.getElementById('deleteModal');
+  modal.classList.add('is-open');
+  modal.setAttribute('aria-hidden', 'false');
+  document.getElementById('confirmDeleteButton').focus();
+}
+
+function closeDeleteModal() {
+  _pendingDeleteId = null;
+  const modal = document.getElementById('deleteModal');
+  modal.classList.remove('is-open');
+  modal.setAttribute('aria-hidden', 'true');
+}
+
+async function confirmDelete() {
+  if (!_pendingDeleteId) return;
+  const id = _pendingDeleteId;
+  closeDeleteModal();
+
+  try {
+    const res = await fetch(`/api/vehicles/${encodeURIComponent(id)}`, { method: 'DELETE' });
+    await readApiPayload(res, 'Nie udało się usunąć konfiguracji.');
+    updateStatus('Konfiguracja została usunięta.');
+    await loadCars();
+  } catch (err) {
+    updateStatus(err.message, true);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Modal podglądu
+// ---------------------------------------------------------------------------
+
+function openPreviewModal(rowData) {
+  const name = [rowData.brand, rowData.model, rowData.versionName].filter(Boolean).join(' ') || rowData.displayName || 'Konfiguracja';
+  document.getElementById('previewModalTitle').textContent = name;
+
+  const rows = [
+    ['Marka', rowData.brand],
+    ['Model', rowData.model],
+    ['Wersja', rowData.versionName],
+    ['Kolor', rowData.exteriorColor],
+    ['Cena końcowa', rowData.totalPricePln != null ? currencyFormatter(rowData.totalPricePln) : null],
+    ['Zasięg WLTP', rowData.rangeWltpKm != null ? numberFormatter(rowData.rangeWltpKm, 'km') : null],
+    ['Bateria', rowData.batteryCapacityKwh != null ? numberFormatter(rowData.batteryCapacityKwh, 'kWh') : null],
+    ['Moc', rowData.powerHp != null ? numberFormatter(rowData.powerHp, 'KM') : null],
+    ['Zużycie', rowData.energyConsumptionKwh100km != null ? numberFormatter(rowData.energyConsumptionKwh100km, 'kWh/100 km') : null],
+    ['Moment obrotowy', rowData.torqueNm != null ? numberFormatter(rowData.torqueNm, 'Nm') : null],
+    ['Felgi', rowData.wheels],
+    ['Wnętrze', rowData.interiorTrim],
+    ['CO₂', rowData.co2EmissionGkm != null ? numberFormatter(rowData.co2EmissionGkm, 'g/km') : null],
+    ['Homologacja', rowData.homologationStandard],
+    ['Kod konfiguracji', rowData.configurationCode],
+    ['Data konfiguracji', rowData.sourceDate],
+  ].filter(([, v]) => v != null && v !== '');
+
+  const equipRows = [
+    ['Wyposażenie seryjne', rowData.standardEquipment],
+    ['Opcje dodatkowe', rowData.additionalEquipment],
+    ['Pakiety', rowData.equipmentPackages],
+  ].filter(([, arr]) => Array.isArray(arr) && arr.length);
+
+  const body = document.getElementById('previewModalBody');
+  body.innerHTML = `
+    <dl class="preview-dl">
+      ${rows.map(([k, v]) => `<dt>${escapeHtml(k)}</dt><dd>${escapeHtml(String(v))}</dd>`).join('')}
+    </dl>
+    ${equipRows.map(([heading, items]) => `
+      <details class="preview-equip">
+        <summary>${escapeHtml(heading)} <span class="preview-equip-count">(${items.length})</span></summary>
+        <ul>${items.map((i) => `<li>${escapeHtml(String(i))}</li>`).join('')}</ul>
+      </details>`).join('')}
+  `;
+
+  const modal = document.getElementById('previewModal');
+  modal.classList.add('is-open');
+  modal.setAttribute('aria-hidden', 'false');
+  document.getElementById('closePreviewButton').focus();
+}
+
+function closePreviewModal() {
+  const modal = document.getElementById('previewModal');
+  modal.classList.remove('is-open');
+  modal.setAttribute('aria-hidden', 'true');
 }
 
 function bindEvents() {
@@ -2211,6 +2365,18 @@ function bindEvents() {
     .querySelectorAll('[data-close-modal="true"]')
     .forEach((node) => node.addEventListener('click', closeImportModal));
   document.getElementById('confirmImportButton').addEventListener('click', submitImportBatch);
+
+  // Modal usunięcia
+  document.getElementById('closeDeleteButton').addEventListener('click', closeDeleteModal);
+  document.getElementById('cancelDeleteButton').addEventListener('click', closeDeleteModal);
+  document.getElementById('confirmDeleteButton').addEventListener('click', confirmDelete);
+  document.querySelectorAll('[data-close-delete-modal="true"]')
+    .forEach((node) => node.addEventListener('click', closeDeleteModal));
+
+  // Modal podglądu
+  document.getElementById('closePreviewButton').addEventListener('click', closePreviewModal);
+  document.querySelectorAll('[data-close-preview-modal="true"]')
+    .forEach((node) => node.addEventListener('click', closePreviewModal));
 
   document.querySelectorAll('[data-import-tab]').forEach((button) => {
     button.addEventListener('click', () => setImportMode(button.getAttribute('data-import-tab')));
