@@ -1859,6 +1859,7 @@ function showAllColumns() {
 function setOverlay(name) {
   state.activeOverlay = name;
   document.body.classList.toggle('has-overlay', Boolean(name));
+  document.documentElement.style.overflow = name ? 'hidden' : '';
 }
 
 function focusElement(node) {
@@ -2125,7 +2126,7 @@ async function submitImportBatch() {
       }
 
       closeImportModal();
-      updateStatus(buildBulkImportStatus(successes.length, failures.length), failures.length > 0);
+      showNotification(buildBulkImportStatus(successes.length, failures.length), failures.length > 0);
       await loadCars();
       return;
     }
@@ -2140,7 +2141,7 @@ async function submitImportBatch() {
       const payload = await importUrl(url);
 
       closeImportModal();
-      updateStatus(payload.message || 'Konfiguracja zostala dodana.');
+      showNotification(payload.message || 'Konfiguracja została dodana.');
       await loadCars();
       return;
     }
@@ -2171,7 +2172,7 @@ async function submitImportBatch() {
     const payload = await readApiPayload(response, 'Nie udało się zapisać konfiguracji.');
 
     closeImportModal();
-    updateStatus(payload.message || 'Konfiguracja została dodana.');
+    showNotification(payload.message || 'Konfiguracja została dodana.');
     await loadCars();
   } catch (error) {
     updateImportStatus(error.message, true);
@@ -2194,6 +2195,7 @@ function openDeleteModal(rowData) {
   const modal = document.getElementById('deleteModal');
   modal.classList.add('is-open');
   modal.setAttribute('aria-hidden', 'false');
+  setOverlay('deleteModal');
   document.getElementById('confirmDeleteButton').focus();
 }
 
@@ -2202,20 +2204,29 @@ function closeDeleteModal() {
   const modal = document.getElementById('deleteModal');
   modal.classList.remove('is-open');
   modal.setAttribute('aria-hidden', 'true');
+  if (state.activeOverlay === 'deleteModal') setOverlay(null);
 }
 
 async function confirmDelete() {
   if (!_pendingDeleteId) return;
   const id = _pendingDeleteId;
-  closeDeleteModal();
+  const btn = document.getElementById('confirmDeleteButton');
+
+  btn.disabled = true;
+  btn.textContent = 'Usuwanie…';
 
   try {
     const res = await fetch(`/api/vehicles/${encodeURIComponent(id)}`, { method: 'DELETE' });
     await readApiPayload(res, 'Nie udało się usunąć konfiguracji.');
-    updateStatus('Konfiguracja została usunięta.');
+    closeDeleteModal();
+    showNotification('Konfiguracja została usunięta.');
     await loadCars();
   } catch (err) {
-    updateStatus(err.message, true);
+    closeDeleteModal();
+    showNotification(err.message, true);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Usuń';
   }
 }
 
@@ -2267,6 +2278,7 @@ function openPreviewModal(rowData) {
   const modal = document.getElementById('previewModal');
   modal.classList.add('is-open');
   modal.setAttribute('aria-hidden', 'false');
+  setOverlay('previewModal');
   document.getElementById('closePreviewButton').focus();
 }
 
@@ -2274,6 +2286,7 @@ function closePreviewModal() {
   const modal = document.getElementById('previewModal');
   modal.classList.remove('is-open');
   modal.setAttribute('aria-hidden', 'true');
+  if (state.activeOverlay === 'previewModal') setOverlay(null);
 }
 
 function bindEvents() {

@@ -1272,6 +1272,7 @@ button {
   left: 50%;
   top: 50%;
   width: min(100% - 24px, 620px);
+  max-height: calc(100dvh - 48px);
   padding: 28px;
   border-radius: var(--radius-xl);
   border: 1px solid var(--line);
@@ -1280,6 +1281,8 @@ button {
   box-shadow:
     0 8px 36px rgba(4, 78, 59, 0.14),
     0 28px 90px rgba(4, 78, 59, 0.12);
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .modal.is-open .modal-panel {
