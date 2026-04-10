@@ -34,6 +34,7 @@ function mapVehicleRow(row) {
     uploadId: row.upload_id,
     sourceType: row.source_type || 'upload',
     sourceUrl: row.source_url || null,
+    storedName: row.stored_name || '',
     brand: row.brand,
     model: row.model,
     versionName: row.version_name,
@@ -409,12 +410,13 @@ async function getVehicleById(vehicleId) {
       ...vehicle,
       sourceType: upload ? upload.sourceType : 'upload',
       sourceUrl: upload ? upload.sourceUrl || null : null,
+      storedName: upload ? upload.storedName || '' : '',
     };
   }
 
   const db = await initMariaDbPool();
   const [rows] = await db.execute(
-    `SELECT v.*, u.source_type, u.source_url
+    `SELECT v.*, u.source_type, u.source_url, u.stored_name
      FROM vehicles v
      JOIN uploads u ON u.id = v.upload_id
      WHERE v.id = ? LIMIT 1`,
@@ -524,6 +526,7 @@ async function listVehicles() {
           ...vehicle,
           sourceType: upload ? upload.sourceType : 'upload',
           sourceUrl: upload ? upload.sourceUrl || null : null,
+          storedName: upload ? upload.storedName || '' : '',
         };
       })
       .sort((left, right) => new Date(right.createdAt || 0) - new Date(left.createdAt || 0));
@@ -534,7 +537,8 @@ async function listVehicles() {
     SELECT
       v.*,
       u.source_type,
-      u.source_url
+      u.source_url,
+      u.stored_name
     FROM vehicles v
     JOIN uploads u ON u.id = v.upload_id
     ORDER BY v.created_at DESC

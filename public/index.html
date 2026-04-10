@@ -10,7 +10,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700;800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="/vendor/tabulator/css/tabulator.min.css" />
-    <link rel="stylesheet" href="/styles.css?v=20260410-5" />
+    <link rel="stylesheet" href="/styles.css?v=20260410-6" />
   </head>
   <body>
     <div class="page-shell">
@@ -202,12 +202,20 @@
               <input id="manualVersion" type="text" placeholder="np. Standard Range" autocomplete="off" />
             </label>
             <label class="field">
+              <span>Pełna nazwa</span>
+              <input id="manualDisplayName" type="text" placeholder="np. Kia EV3 Standard Range" autocomplete="off" />
+            </label>
+            <label class="field">
               <span>Kolor</span>
               <input id="manualColor" type="text" placeholder="np. Czarny metalik" autocomplete="off" />
             </label>
             <label class="field">
               <span>Cena końcowa (zł)</span>
               <input id="manualPrice" type="number" min="0" step="1" placeholder="np. 219900" />
+            </label>
+            <label class="field">
+              <span>Cena bazowa (zł)</span>
+              <input id="manualBasePricePln" type="number" min="0" step="1" placeholder="np. 189900" />
             </label>
             <label class="field">
               <span>Zasięg WLTP (km)</span>
@@ -222,9 +230,77 @@
               <input id="manualPower" type="number" min="0" step="1" placeholder="np. 204" />
             </label>
             <label class="field">
+              <span>Moc (kW)</span>
+              <input id="manualPowerKw" type="number" min="0" step="0.1" placeholder="np. 150" />
+            </label>
+            <label class="field">
+              <span>Moment obrotowy (Nm)</span>
+              <input id="manualTorqueNm" type="number" min="0" step="1" placeholder="np. 255" />
+            </label>
+            <label class="field">
               <span>Zużycie energii (kWh/100 km)</span>
               <input id="manualConsumption" type="number" min="0" step="0.1" placeholder="np. 14.3" />
             </label>
+            <label class="field">
+              <span>CO₂ (g/km)</span>
+              <input id="manualCo2" type="number" min="0" step="0.1" placeholder="np. 0" />
+            </label>
+            <label class="field">
+              <span>Liczba miejsc</span>
+              <input id="manualSeats" type="number" min="1" step="1" placeholder="np. 5" />
+            </label>
+            <label class="field">
+              <span>Felgi</span>
+              <input id="manualWheels" type="text" placeholder='np. 19"' autocomplete="off" />
+            </label>
+            <label class="field">
+              <span>Wnętrze</span>
+              <input id="manualInteriorTrim" type="text" placeholder="np. Czarna tkanina" autocomplete="off" />
+            </label>
+            <label class="field">
+              <span>Paliwo</span>
+              <input id="manualFuelType" type="text" placeholder="np. BEV" autocomplete="off" />
+            </label>
+            <label class="field">
+              <span>Homologacja</span>
+              <input id="manualHomologation" type="text" placeholder="np. M1" autocomplete="off" />
+            </label>
+            <label class="field">
+              <span>Kod konfiguracji</span>
+              <input id="manualConfigCode" type="text" placeholder="np. KIA-EV3-2025-001" autocomplete="off" />
+            </label>
+            <label class="field">
+              <span>Data konfiguracji</span>
+              <input id="manualSourceDate" type="date" />
+            </label>
+            <label class="field manual-form-full">
+              <span>Gabaryt — odpowiedniki spalinowe (po jednym w linii)</span>
+              <textarea id="manualCombustionEquivalents" rows="2" placeholder="np. Volkswagen Golf&#10;Toyota Corolla"></textarea>
+            </label>
+            <label class="field manual-form-full">
+              <span>Pakiety wyposażenia (po jednym w linii)</span>
+              <textarea id="manualEquipmentPackages" rows="2" placeholder="np. Pakiet technologiczny&#10;Pakiet zimowy"></textarea>
+            </label>
+            <label class="field manual-form-full">
+              <span>Seryjne wyposażenie (po jednym w linii)</span>
+              <textarea id="manualStandardEquipment" rows="3" placeholder="np. Klimatyzacja automatyczna&#10;Nawigacja satelitarna"></textarea>
+            </label>
+            <label class="field manual-form-full">
+              <span>Dodatkowe wyposażenie (po jednym w linii)</span>
+              <textarea id="manualAdditionalEquipment" rows="3" placeholder="np. Panoramiczny dach&#10;System audio premium"></textarea>
+            </label>
+            <label class="field manual-form-full">
+              <span>Notatki (po jednej w linii)</span>
+              <textarea id="manualNotes" rows="2" placeholder="np. Oferta specjalna Q1 2025"></textarea>
+            </label>
+            <div class="field manual-form-full">
+              <span>Załącznik PDF (opcjonalnie)</span>
+              <label class="upload-dropzone upload-dropzone--compact" for="manualFileInput">
+                <span class="upload-title">📎 Kliknij, aby wybrać plik PDF</span>
+              </label>
+              <input id="manualFileInput" type="file" accept="application/pdf,.pdf" hidden />
+              <p id="manualFileName" class="field-hint">Nie wybrano pliku</p>
+            </div>
           </div>
           <p class="field-hint">Pola oznaczone <span class="field-required">*</span> są wymagane.</p>
         </div>
@@ -308,6 +384,6 @@
     </div>
 
     <script src="/vendor/tabulator/js/tabulator.min.js"></script>
-    <script src="/app.js?v=20260410-5" defer></script>
+    <script src="/app.js?v=20260410-6" defer></script>
   </body>
 </html>

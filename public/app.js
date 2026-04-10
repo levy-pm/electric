@@ -1910,9 +1910,17 @@ function resetImportForm() {
   document.getElementById('modalUploadInput').value = '';
   document.getElementById('configurationUrlInput').value = '';
   document.getElementById('selectedFileName').textContent = 'Nie wybrano plikow.';
-  ['manualBrand', 'manualModel', 'manualVersion', 'manualColor',
-   'manualPrice', 'manualRange', 'manualBattery', 'manualPower', 'manualConsumption']
-    .forEach((id) => { document.getElementById(id).value = ''; });
+  [
+    'manualBrand', 'manualModel', 'manualVersion', 'manualDisplayName', 'manualColor',
+    'manualPrice', 'manualBasePricePln', 'manualRange', 'manualBattery',
+    'manualPower', 'manualPowerKw', 'manualTorqueNm', 'manualConsumption',
+    'manualCo2', 'manualSeats', 'manualWheels', 'manualInteriorTrim',
+    'manualFuelType', 'manualHomologation', 'manualConfigCode', 'manualSourceDate',
+    'manualCombustionEquivalents', 'manualEquipmentPackages',
+    'manualStandardEquipment', 'manualAdditionalEquipment', 'manualNotes',
+  ].forEach((id) => { document.getElementById(id).value = ''; });
+  document.getElementById('manualFileInput').value = '';
+  document.getElementById('manualFileName').textContent = 'Nie wybrano pliku';
   updateImportStatus('');
   setImportMode('file');
 }
@@ -2154,20 +2162,43 @@ async function submitImportBatch() {
     }
 
     updateImportStatus('Zapisuję konfigurację...');
+    const manualFormData = new FormData();
+    [
+      ['brand', 'manualBrand'], ['model', 'manualModel'], ['versionName', 'manualVersion'],
+      ['displayName', 'manualDisplayName'], ['exteriorColor', 'manualColor'],
+      ['wheels', 'manualWheels'], ['interiorTrim', 'manualInteriorTrim'],
+      ['fuelType', 'manualFuelType'], ['homologationStandard', 'manualHomologation'],
+      ['configurationCode', 'manualConfigCode'], ['sourceDate', 'manualSourceDate'],
+    ].forEach(([key, id]) => {
+      const val = document.getElementById(id).value.trim();
+      if (val) manualFormData.set(key, val);
+    });
+    [
+      ['totalPricePln', 'manualPrice'], ['basePricePln', 'manualBasePricePln'],
+      ['rangeWltpKm', 'manualRange'], ['batteryCapacityKwh', 'manualBattery'],
+      ['powerHp', 'manualPower'], ['powerKw', 'manualPowerKw'],
+      ['torqueNm', 'manualTorqueNm'], ['energyConsumptionKwh100km', 'manualConsumption'],
+      ['co2EmissionGkm', 'manualCo2'], ['seats', 'manualSeats'],
+    ].forEach(([key, id]) => {
+      const val = document.getElementById(id).value.trim();
+      if (val) manualFormData.set(key, val);
+    });
+    [
+      ['combustionEquivalents', 'manualCombustionEquivalents'],
+      ['equipmentPackages', 'manualEquipmentPackages'],
+      ['standardEquipment', 'manualStandardEquipment'],
+      ['additionalEquipment', 'manualAdditionalEquipment'],
+      ['notes', 'manualNotes'],
+    ].forEach(([key, id]) => {
+      const val = document.getElementById(id).value.trim();
+      if (val) manualFormData.set(key, val);
+    });
+    const manualFile = document.getElementById('manualFileInput').files[0];
+    if (manualFile) manualFormData.set('configurationFile', manualFile);
+
     const response = await fetch('/api/manual', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        brand: brand || null,
-        model: model || null,
-        versionName: document.getElementById('manualVersion').value.trim() || null,
-        exteriorColor: document.getElementById('manualColor').value.trim() || null,
-        totalPricePln: document.getElementById('manualPrice').value || null,
-        rangeWltpKm: document.getElementById('manualRange').value || null,
-        batteryCapacityKwh: document.getElementById('manualBattery').value || null,
-        powerHp: document.getElementById('manualPower').value || null,
-        energyConsumptionKwh100km: document.getElementById('manualConsumption').value || null,
-      }),
+      body: manualFormData,
     });
     const payload = await readApiPayload(response, 'Nie udało się zapisać konfiguracji.');
 
@@ -2399,6 +2430,11 @@ function bindEvents() {
     const files = Array.from(event.target.files || []);
     state.pendingFiles = files;
     document.getElementById('selectedFileName').textContent = getPendingFilesLabel(files);
+  });
+
+  document.getElementById('manualFileInput').addEventListener('change', (event) => {
+    const file = event.target.files[0];
+    document.getElementById('manualFileName').textContent = file ? file.name : 'Nie wybrano pliku';
   });
 
   document.addEventListener('click', (event) => {

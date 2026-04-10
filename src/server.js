@@ -60,7 +60,9 @@ function toClientVehicle(vehicle, rateInfo = null) {
   const allEquipment = [...new Map(equipmentEntries.map((entry) => [entry.slug, entry.label])).values()];
   const equipmentSlugs = [...new Set(equipmentEntries.map((entry) => entry.slug))];
   const configurationDownloadUrl =
-    vehicle.sourceType === 'upload' ? `/api/uploads/${vehicle.uploadId}/file` : null;
+    (vehicle.sourceType === 'upload' || (vehicle.sourceType === 'manual' && vehicle.storedName))
+      ? `/api/uploads/${vehicle.uploadId}/file`
+      : null;
   const configurationSourceUrl = vehicle.sourceType === 'url' ? vehicle.sourceUrl : null;
 
   return enrichVehiclePrices({
@@ -274,7 +276,7 @@ async function createApp() {
 
   app.get('/api/uploads/:uploadId/file', asyncRoute(async (req, res) => {
     const uploadEntry = await store.getUploadById(req.params.uploadId);
-    if (!uploadEntry || uploadEntry.sourceType !== 'upload' || !uploadEntry.storedName) {
+    if (!uploadEntry || !uploadEntry.storedName) {
       res.status(404).json({ error: 'Nie znaleziono pliku konfiguracji.' });
       return;
     }
@@ -425,7 +427,7 @@ async function createApp() {
     });
   }));
 
-  app.post('/api/manual', uploadLimiter, asyncRoute(async (req, res) => {
+  app.post('/api/manual', uploadLimiter, upload.single('configurationFile'), asyncRoute(async (req, res) => {
     const body = req.body || {};
 
     const brand = normalizeOptionalText(body.brand);
@@ -435,56 +437,65 @@ async function createApp() {
       return;
     }
 
+    const parseLines = (value) => (value ? String(value).split('\n').map((s) => s.trim()).filter(Boolean) : []);
+
     const totalPricePln = normalizeOptionalNumber('totalPricePln', body.totalPricePln);
+    const basePricePln = normalizeOptionalNumber('basePricePln', body.basePricePln);
     const rangeWltpKm = normalizeOptionalNumber('rangeWltpKm', body.rangeWltpKm);
     const batteryCapacityKwh = normalizeOptionalNumber('batteryCapacityKwh', body.batteryCapacityKwh);
     const powerHp = normalizeOptionalNumber('powerHp', body.powerHp);
+    const powerKw = normalizeOptionalNumber('powerKw', body.powerKw);
+    const torqueNm = normalizeOptionalNumber('torqueNm', body.torqueNm);
     const energyConsumptionKwh100km = normalizeOptionalNumber('energyConsumptionKwh100km', body.energyConsumptionKwh100km);
+    const co2EmissionGkm = normalizeOptionalNumber('co2EmissionGkm', body.co2EmissionGkm);
+    const seats = normalizeOptionalNumber('seats', body.seats);
 
-    const displayName = [brand, model, normalizeOptionalText(body.versionName)].filter(Boolean).join(' ') || 'Ręczna konfiguracja';
+    const versionName = normalizeOptionalText(body.versionName);
+    const displayNameInput = normalizeOptionalText(body.displayName);
+    const displayName = displayNameInput || [brand, model, versionName].filter(Boolean).join(' ') || 'Ręczna konfiguracja';
 
     const uploadEntry = await store.createUpload({
       sourceType: 'manual',
       sourceUrl: null,
-      originalName: displayName,
-      storedName: '',
-      mimeType: 'application/json',
-      sizeBytes: 0,
+      originalName: req.file ? req.file.originalname : displayName,
+      storedName: req.file ? req.file.filename : '',
+      mimeType: req.file ? req.file.mimetype : 'application/json',
+      sizeBytes: req.file ? req.file.size : 0,
     });
 
     const vehicle = {
       brand,
       model,
-      versionName: normalizeOptionalText(body.versionName),
+      versionName,
       displayName,
       currency: 'PLN',
-      basePricePln: totalPricePln,
+      basePricePln: basePricePln ?? totalPricePln,
       totalPricePln,
-      powerKw: null,
+      powerKw,
       powerHp,
-      torqueNm: null,
+      torqueNm,
       rangeWltpKm,
       batteryCapacityKwh,
       energyConsumptionKwh100km,
-      seats: null,
-      fuelType: 'BEV',
-      homologationStandard: null,
-      co2EmissionGkm: null,
+      seats,
+      fuelType: normalizeOptionalText(body.fuelType) || 'BEV',
+      homologationStandard: normalizeOptionalText(body.homologationStandard),
+      co2EmissionGkm,
       technicalType: null,
       exteriorColor: normalizeOptionalText(body.exteriorColor),
       exteriorColorPricePln: null,
-      wheels: null,
+      wheels: normalizeOptionalText(body.wheels),
       wheelsPricePln: null,
-      interiorTrim: null,
+      interiorTrim: normalizeOptionalText(body.interiorTrim),
       interiorPricePln: null,
-      additionalEquipment: [],
-      standardEquipment: [],
-      equipmentPackages: [],
-      configurationCode: null,
-      sourceDate: new Date().toISOString().split('T')[0],
-      notes: [],
+      additionalEquipment: parseLines(body.additionalEquipment),
+      standardEquipment: parseLines(body.standardEquipment),
+      equipmentPackages: parseLines(body.equipmentPackages),
+      configurationCode: normalizeOptionalText(body.configurationCode),
+      sourceDate: normalizeOptionalText(body.sourceDate) || new Date().toISOString().split('T')[0],
+      notes: parseLines(body.notes),
       warnings: [],
-      combustionEquivalents: [],
+      combustionEquivalents: parseLines(body.combustionEquivalents),
       equipmentScore: 0,
       createdAt: new Date().toISOString(),
     };
