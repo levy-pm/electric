@@ -1542,6 +1542,8 @@ function createTable(items) {
 
   if (state.table) {
     state.table.setColumns(getColumns());
+    const savedLayout = loadColumnLayout();
+    if (savedLayout) applyColumnLayout(savedLayout);
     state.table.replaceData(items);
     renderColumnsDrawerContent();
     return;
