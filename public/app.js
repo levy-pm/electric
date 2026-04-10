@@ -451,6 +451,7 @@ function rowBadgeFormatter(cell) {
 
 function topRowFormatter(row) {
   row.getElement().classList.toggle('is-top-recommendation', Boolean(row.getData().isSuggestedTop));
+  row.normalizeHeight();
 }
 
 function openConfiguration(rowData) {

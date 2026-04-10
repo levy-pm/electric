@@ -827,7 +827,6 @@ button {
 .tabulator-row.is-top-recommendation {
   background: linear-gradient(90deg, rgba(5, 150, 105, 0.16), rgba(240, 253, 244, 0.35)) !important;
   box-shadow: inset 4px 0 0 var(--accent) !important;
-  font-weight: 500;
 }
 
 .tabulator-row.is-top-recommendation:hover {
