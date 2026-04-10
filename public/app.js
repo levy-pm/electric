@@ -1643,17 +1643,17 @@ function updateSummary(items) {
   const top = items[0];
   topCarName.textContent = [top.brand, top.model].filter(Boolean).join(' ') || top.displayName || 'Bez nazwy';
 
-  // Pokaż kluczowe metryki + wskaźnik VfM: km zasięgu na 1000 PLN
-  const rangePerKPrice =
+  // Pokaż kluczowe metryki + wskaźnik VfM: koszt 1000 km zasięgu (tys. zł / 1000 km)
+  const plnPer1000km =
     top.rangeWltpKm && top.totalPricePln && top.totalPricePln > 0
-      ? Math.round((top.rangeWltpKm / top.totalPricePln) * 1000)
+      ? Math.round(top.totalPricePln / top.rangeWltpKm)
       : null;
 
   topCarMeta.textContent = [
     currencyFormatter(top.totalPricePln),
     numberFormatter(top.rangeWltpKm, 'km zasięgu'),
     top.batteryCapacityKwh ? numberFormatter(top.batteryCapacityKwh, 'kWh') : null,
-    rangePerKPrice !== null ? `${rangePerKPrice} km/1000 zł` : null,
+    plnPer1000km !== null ? `${plnPer1000km} zł/km zasięgu` : null,
   ]
     .filter(Boolean)
     .join(' • ');
