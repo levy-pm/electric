@@ -30,7 +30,7 @@ const state = {
   equipmentSearchQuery: '',
   equipmentDropdownOpen: false,
   importMode: 'file',
-  pendingFile: null,
+  pendingFiles: [],
   activeOverlay: null,
   drawerReturnFocus: null,
   modalReturnFocus: null,
@@ -1879,10 +1879,10 @@ function setImportMode(mode) {
 }
 
 function resetImportForm() {
-  state.pendingFile = null;
+  state.pendingFiles = [];
   document.getElementById('modalUploadInput').value = '';
   document.getElementById('configurationUrlInput').value = '';
-  document.getElementById('selectedFileName').textContent = 'Nie wybrano pliku.';
+  document.getElementById('selectedFileName').textContent = 'Nie wybrano plikow.';
   updateImportStatus('');
   setImportMode('file');
 }
@@ -2007,6 +2007,39 @@ async function uploadFile(file) {
   return waitForUploadCompletion(payload.uploadId, file.name);
 }
 
+function getPendingFilesLabel(files) {
+  if (!Array.isArray(files) || !files.length) {
+    return 'Nie wybrano plikow.';
+  }
+
+  if (files.length === 1) {
+    return `Wybrano: ${files[0].name}`;
+  }
+
+  const preview = files
+    .slice(0, 3)
+    .map((file) => file.name)
+    .join(', ');
+  const suffix = files.length > 3 ? ` (+${files.length - 3} kolejne)` : '';
+  return `Wybrano ${files.length} pliki: ${preview}${suffix}`;
+}
+
+function buildBulkImportStatus(successes, failures) {
+  if (successes && !failures) {
+    return successes === 1
+      ? '1 konfiguracja zostala dodana.'
+      : `${successes} konfiguracje zostaly dodane.`;
+  }
+
+  if (successes && failures) {
+    return `${successes} konfiguracje dodane, ${failures} nieudane.`;
+  }
+
+  return failures === 1
+    ? 'Nie udalo sie dodac 1 konfiguracji.'
+    : `Nie udalo sie dodac ${failures} konfiguracji.`;
+}
+
 async function importUrl(url) {
   const response = await fetch('/api/import-url', {
     method: 'POST',
@@ -2020,31 +2053,64 @@ async function importUrl(url) {
 }
 
 async function submitImport() {
+  return submitImportBatch();
+}
+
+async function submitImportBatch() {
   const confirmButton = document.getElementById('confirmImportButton');
   confirmButton.disabled = true;
 
   try {
-    let payload;
-
     if (state.importMode === 'file') {
-      if (!state.pendingFile) {
-        throw new Error('Najpierw wybierz plik PDF.');
+      if (!state.pendingFiles.length) {
+        throw new Error('Najpierw wybierz co najmniej jeden plik PDF.');
       }
 
-      updateImportStatus(`Analizuję plik: ${state.pendingFile.name}...`);
-      payload = await uploadFile(state.pendingFile);
-    } else {
-      const url = document.getElementById('configurationUrlInput').value.trim();
-      if (!url) {
-        throw new Error('Wklej link do konfiguracji.');
+      const successes = [];
+      const failures = [];
+
+      for (let index = 0; index < state.pendingFiles.length; index += 1) {
+        const file = state.pendingFiles[index];
+        updateImportStatus(`Analizuje plik ${index + 1}/${state.pendingFiles.length}: ${file.name}...`);
+
+        try {
+          const payload = await uploadFile(file);
+          successes.push({
+            fileName: file.name,
+            uploadId: payload.uploadId,
+          });
+        } catch (error) {
+          failures.push({
+            fileName: file.name,
+            message: error.message,
+          });
+        }
       }
 
-      updateImportStatus('Analizuję link do konfiguracji...');
-      payload = await importUrl(url);
+      if (!successes.length) {
+        const details = failures
+          .slice(0, 3)
+          .map((entry) => `${entry.fileName}: ${entry.message}`)
+          .join(' | ');
+        throw new Error(details || 'Nie udalo sie przetworzyc wybranych plikow.');
+      }
+
+      closeImportModal();
+      updateStatus(buildBulkImportStatus(successes.length, failures.length), failures.length > 0);
+      await loadCars();
+      return;
     }
 
+    const url = document.getElementById('configurationUrlInput').value.trim();
+    if (!url) {
+      throw new Error('Wklej link do konfiguracji.');
+    }
+
+    updateImportStatus('Analizuje link do konfiguracji...');
+    const payload = await importUrl(url);
+
     closeImportModal();
-    updateStatus(payload.message || 'Konfiguracja została dodana.');
+    updateStatus(payload.message || 'Konfiguracja zostala dodana.');
     await loadCars();
   } catch (error) {
     updateImportStatus(error.message, true);
@@ -2141,18 +2207,16 @@ function bindEvents() {
   document
     .querySelectorAll('[data-close-modal="true"]')
     .forEach((node) => node.addEventListener('click', closeImportModal));
-  document.getElementById('confirmImportButton').addEventListener('click', submitImport);
+  document.getElementById('confirmImportButton').addEventListener('click', submitImportBatch);
 
   document.querySelectorAll('[data-import-tab]').forEach((button) => {
     button.addEventListener('click', () => setImportMode(button.getAttribute('data-import-tab')));
   });
 
   document.getElementById('modalUploadInput').addEventListener('change', (event) => {
-    const [file] = event.target.files || [];
-    state.pendingFile = file || null;
-    document.getElementById('selectedFileName').textContent = file
-      ? `Wybrano: ${file.name}`
-      : 'Nie wybrano pliku.';
+    const files = Array.from(event.target.files || []);
+    state.pendingFiles = files;
+    document.getElementById('selectedFileName').textContent = getPendingFilesLabel(files);
   });
 
   document.addEventListener('click', (event) => {

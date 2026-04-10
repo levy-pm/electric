@@ -110,6 +110,29 @@ npm run deploy:sync
 
 Import PDF automatycznie ponawia chwilowe bledy `503/UNAVAILABLE` z Gemini. Gdy ustawisz `GEMINI_API_KEYS`, po wyczerpaniu limitu albo przeciążeniu jednego klucza aplikacja przejdzie do kolejnego. Limity ponowien ustawisz przez `GEMINI_BUSY_RETRY_ATTEMPTS` i `GEMINI_BUSY_RETRY_BASE_DELAY_MS`.
 
+## Import wielu PDF-ow
+
+Frontend pozwala wybrac kilka PDF-ow naraz i wysyla je sekwencyjnie po istniejacym `/api/upload-async`, wiec nie trzeba zmieniac kontraktu API.
+
+Jesli chcesz zaladowac konfiguracje bezposrednio na serwerze, bez przegladarki, uzyj skryptu CLI:
+
+```bash
+npm run import:pdfs -- /sciezka/do/katalogu-z-pdf
+```
+
+Mozesz tez podac kilka plikow lub katalogow:
+
+```bash
+npm run import:pdfs -- "/home/problems/tmp/x1.pdf" "/home/problems/tmp/x2.pdf"
+```
+
+Skrypt:
+
+- kopiuje PDF-y do `storage/uploads`
+- tworzy rekord `uploads` w bazie
+- parsuje pliki tym samym flow Gemini co aplikacja webowa
+- zapisuje rekordy `vehicles` i oznacza import jako `completed` albo `failed`
+
 ## Logika rekomendacji
 
 Domyslny ranking MVP:

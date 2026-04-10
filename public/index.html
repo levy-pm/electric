@@ -162,12 +162,12 @@
 
         <div id="importFilePanel" class="modal-tab-panel is-active">
           <label class="upload-dropzone" for="modalUploadInput">
-            <span class="upload-title">📎 Przeciągnij plik PDF tutaj lub kliknij, aby wybrać</span>
+            <span class="upload-title">📎 Przeciągnij pliki PDF tutaj lub kliknij, aby wybrać</span>
             <span class="upload-copy">Wspieramy konfiguratory Renault, Volkswagen, Kia, Honda, Ford i innych marek ekologicznych.</span>
             <span class="upload-pill">🌍 Maksymalny rozmiar: 20 MB</span>
           </label>
-          <input id="modalUploadInput" type="file" accept="application/pdf,.pdf" hidden />
-          <p id="selectedFileName" class="field-hint">Nie wybrano pliku</p>
+          <input id="modalUploadInput" type="file" accept="application/pdf,.pdf" multiple hidden />
+          <p id="selectedFileName" class="field-hint">Nie wybrano plików</p>
         </div>
 
         <div id="importUrlPanel" class="modal-tab-panel" hidden>
