@@ -1,22 +1,21 @@
 /**
  * System rekomendacji pojazdów elektrycznych.
  *
- * Każdy pojazd dostaje wynik [0, 1] jako ważoną sumę znormalizowanych metryk.
+ * Scoring oparty na "value for money" — każdy pojazd oceniany jest przez pryzmat
+ * tego, ile zasięgu, baterii i wyposażenia oferuje względem swojej ceny.
  * Normalizacja min-max gwarantuje, że żadna skala jednostek nie faworyzuje jednej cechy.
  * Etykiety liderów muszą dokładnie odpowiadać stałej LEADER_LABELS w public/app.js.
  */
 
 // ---------------------------------------------------------------------------
-// Wagi scoringu — suma = 1.0
-// Dostosuj do preferencji użytkowników zmieniając tylko te wartości.
+// Wagi scoringu "value for money" — suma = 1.0
+// Każda metryka to stosunek cechy do ceny (np. km / 1000 PLN).
 // ---------------------------------------------------------------------------
 const SCORING_WEIGHTS = {
-  price: 0.35,      // niższa cena końcowa → wyższy wynik
-  range: 0.25,      // większy zasięg WLTP → wyższy wynik
-  battery: 0.15,    // większa pojemność baterii → wyższy wynik
-  power: 0.12,      // większa moc (KM) → wyższy wynik
-  equipment: 0.08,  // więcej wyposażenia → wyższy wynik (kontrowersyjne — niska waga)
-  efficiency: 0.05, // niższe zużycie energii kWh/100 km → wyższy wynik (eko bonus)
+  rangePerPrice:     0.40,  // km zasięgu WLTP na 1000 PLN — najważniejsze kryterium
+  batteryPerPrice:   0.30,  // kWh baterii na 1000 PLN
+  equipmentPerPrice: 0.20,  // wynik wyposażenia na 1000 PLN
+  efficiency:        0.10,  // niższe zużycie kWh/100 km → eko bonus
 };
 
 // Etykiety odznak liderów — muszą być identyczne z LEADER_LABELS w public/app.js
@@ -110,51 +109,60 @@ function buildBadges(vehicle, leaders) {
   return badges;
 }
 
+/**
+ * Oblicza wskaźnik "value for money" dla jednego pojazdu.
+ * Zwraca null gdy brakuje ceny (bez ceny nie można ocenić VfM).
+ * Jednostka: cecha / 1000 PLN (ułatwia porównywalność liczb).
+ */
+function computeValueRatios(vehicle) {
+  const price = safeNumber(vehicle.totalPricePln);
+  if (!price || price <= 0) {
+    return { rangePerPrice: null, batteryPerPrice: null, equipmentPerPrice: null };
+  }
+
+  const kPrice = price / 1000; // cena w tysiącach PLN
+  const range = safeNumber(vehicle.rangeWltpKm);
+  const battery = safeNumber(vehicle.batteryCapacityKwh);
+  const equipment = safeNumber(vehicle.equipmentScore);
+
+  return {
+    rangePerPrice:     range     !== null ? range     / kPrice : null,
+    batteryPerPrice:   battery   !== null ? battery   / kPrice : null,
+    equipmentPerPrice: equipment !== null ? equipment / kPrice : null,
+  };
+}
+
 function enrichVehicles(vehicles) {
   const leaders = computeLeaders(vehicles);
 
-  // Zbierz wartości do normalizacji
-  const prices = vehicles.map((v) => safeNumber(v.totalPricePln)).filter((x) => x !== null);
-  const ranges = vehicles.map((v) => safeNumber(v.rangeWltpKm)).filter((x) => x !== null);
-  const batteries = vehicles.map((v) => safeNumber(v.batteryCapacityKwh)).filter((x) => x !== null);
-  const powers = vehicles.map((v) => safeNumber(v.powerHp)).filter((x) => x !== null);
-  const equipments = vehicles.map((v) => safeNumber(v.equipmentScore)).filter((x) => x !== null);
-  const efficiencies = vehicles.map((v) => safeNumber(v.energyConsumptionKwh100km)).filter((x) => x !== null);
+  // Oblicz współczynniki VfM dla każdego pojazdu, a następnie ustal min/max do normalizacji
+  const withRatios = vehicles.map((v) => ({ ...v, ...computeValueRatios(v) }));
 
+  const pick = (field) => withRatios.map((v) => v[field]).filter((x) => x !== null);
   const minmax = (arr) => arr.length ? [Math.min(...arr), Math.max(...arr)] : [null, null];
 
-  const [minPrice, maxPrice] = minmax(prices);
-  const [minRange, maxRange] = minmax(ranges);
-  const [minBattery, maxBattery] = minmax(batteries);
-  const [minPower, maxPower] = minmax(powers);
-  const [minEquipment, maxEquipment] = minmax(equipments);
-  const [minEfficiency, maxEfficiency] = minmax(efficiencies);
+  const [minRangePerPrice,     maxRangePerPrice]     = minmax(pick('rangePerPrice'));
+  const [minBatteryPerPrice,   maxBatteryPerPrice]   = minmax(pick('batteryPerPrice'));
+  const [minEquipmentPerPrice, maxEquipmentPerPrice] = minmax(pick('equipmentPerPrice'));
+  const efficiencies = vehicles.map((v) => safeNumber(v.energyConsumptionKwh100km)).filter((x) => x !== null);
+  const [minEfficiency,        maxEfficiency]        = minmax(efficiencies);
 
-  const enriched = vehicles.map((vehicle) => {
+  const enriched = withRatios.map((vehicle) => {
     const badges = buildBadges(vehicle, leaders);
-    const totalPrice = safeNumber(vehicle.totalPricePln);
-    const range = safeNumber(vehicle.rangeWltpKm);
-    const battery = safeNumber(vehicle.batteryCapacityKwh);
-    const power = safeNumber(vehicle.powerHp);
-    const equipment = safeNumber(vehicle.equipmentScore);
     const efficiency = safeNumber(vehicle.energyConsumptionKwh100km);
 
-    // Wynik = ważona suma znormalizowanych metryk (bez premii za odznaki — brak podwójnego liczenia)
+    // Wynik = ważona suma znormalizowanych wskaźników VfM
     const breakdown = {
-      price: normalizeForScore(totalPrice, minPrice, maxPrice, true) * SCORING_WEIGHTS.price,
-      range: normalizeForScore(range, minRange, maxRange) * SCORING_WEIGHTS.range,
-      battery: normalizeForScore(battery, minBattery, maxBattery) * SCORING_WEIGHTS.battery,
-      power: normalizeForScore(power, minPower, maxPower) * SCORING_WEIGHTS.power,
-      equipment: normalizeForScore(equipment, minEquipment, maxEquipment) * SCORING_WEIGHTS.equipment,
-      efficiency: normalizeForScore(efficiency, minEfficiency, maxEfficiency, true) * SCORING_WEIGHTS.efficiency,
+      rangePerPrice:     normalizeForScore(vehicle.rangePerPrice,     minRangePerPrice,     maxRangePerPrice)     * SCORING_WEIGHTS.rangePerPrice,
+      batteryPerPrice:   normalizeForScore(vehicle.batteryPerPrice,   minBatteryPerPrice,   maxBatteryPerPrice)   * SCORING_WEIGHTS.batteryPerPrice,
+      equipmentPerPrice: normalizeForScore(vehicle.equipmentPerPrice, minEquipmentPerPrice, maxEquipmentPerPrice) * SCORING_WEIGHTS.equipmentPerPrice,
+      efficiency:        normalizeForScore(efficiency,                minEfficiency,        maxEfficiency, true)  * SCORING_WEIGHTS.efficiency,
     };
 
     const recommendationScore =
-      breakdown.price +
-      breakdown.range +
-      breakdown.battery +
-      breakdown.power +
-      breakdown.equipment +
+      breakdown.rangePerPrice +
+      breakdown.batteryPerPrice +
+      breakdown.equipmentPerPrice +
       breakdown.efficiency;
 
     return {

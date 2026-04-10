@@ -429,7 +429,7 @@ function rowBadgeFormatter(cell) {
   const icons = [];
 
   if (isTop) {
-    icons.push('<span class="rec-icon" data-ui-tooltip="Nasza rekomendacja" aria-label="Nasza rekomendacja">★</span>');
+    icons.push('<span class="rec-icon" data-ui-tooltip="Najlepsza wartość za pieniądze" aria-label="Najlepsza wartość za pieniądze">★</span>');
   }
 
   if (Array.isArray(badges) && badges.length) {
@@ -1641,10 +1641,18 @@ function updateSummary(items) {
 
   const top = items[0];
   topCarName.textContent = [top.brand, top.model].filter(Boolean).join(' ') || top.displayName || 'Bez nazwy';
+
+  // Pokaż kluczowe metryki + wskaźnik VfM: km zasięgu na 1000 PLN
+  const rangePerKPrice =
+    top.rangeWltpKm && top.totalPricePln && top.totalPricePln > 0
+      ? Math.round((top.rangeWltpKm / top.totalPricePln) * 1000)
+      : null;
+
   topCarMeta.textContent = [
     currencyFormatter(top.totalPricePln),
-    numberFormatter(top.rangeWltpKm, 'km'),
+    numberFormatter(top.rangeWltpKm, 'km zasięgu'),
     top.batteryCapacityKwh ? numberFormatter(top.batteryCapacityKwh, 'kWh') : null,
+    rangePerKPrice !== null ? `${rangePerKPrice} km/1000 zł` : null,
   ]
     .filter(Boolean)
     .join(' • ');
