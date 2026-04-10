@@ -280,6 +280,12 @@ body.is-page-loading .panel-skeleton {
   display: grid;
 }
 
+body.is-page-loading .page-content > * {
+  animation: none;
+  opacity: 1;
+  transform: none;
+}
+
 .skeleton-surface {
   position: relative;
   overflow: hidden;
