@@ -12,7 +12,7 @@
     <link rel="stylesheet" href="/vendor/tabulator/css/tabulator.min.css" />
     <link rel="stylesheet" href="/styles.css?v=20260410-6" />
   </head>
-  <body>
+  <body class="is-page-loading">
     <div class="page-shell">
       <header class="topbar">
         <div class="brand-block">
@@ -37,6 +37,34 @@
           </article>
 
           <div id="leaderCards" class="leader-grid"></div>
+
+          <div class="panel-skeleton panel-skeleton-summary" aria-hidden="true">
+            <article class="skeleton-surface skeleton-hero">
+              <span class="skeleton-block skeleton-pill skeleton-pill-sm"></span>
+              <span class="skeleton-block skeleton-line skeleton-line-xl"></span>
+              <span class="skeleton-block skeleton-line skeleton-line-lg"></span>
+              <div class="skeleton-badge-row">
+                <span class="skeleton-block skeleton-pill skeleton-pill-md"></span>
+                <span class="skeleton-block skeleton-pill skeleton-pill-sm"></span>
+                <span class="skeleton-block skeleton-pill skeleton-pill-md"></span>
+              </div>
+            </article>
+
+            <div class="skeleton-leader-grid">
+              <article class="skeleton-surface skeleton-leader-card">
+                <span class="skeleton-block skeleton-pill skeleton-pill-sm"></span>
+                <span class="skeleton-block skeleton-line skeleton-line-md"></span>
+              </article>
+              <article class="skeleton-surface skeleton-leader-card">
+                <span class="skeleton-block skeleton-pill skeleton-pill-sm"></span>
+                <span class="skeleton-block skeleton-line skeleton-line-md"></span>
+              </article>
+              <article class="skeleton-surface skeleton-leader-card">
+                <span class="skeleton-block skeleton-pill skeleton-pill-sm"></span>
+                <span class="skeleton-block skeleton-line skeleton-line-md"></span>
+              </article>
+            </div>
+          </div>
         </section>
 
         <section class="filters-bar">
@@ -89,6 +117,24 @@
               </div>
             </div>
           </div>
+
+          <div class="panel-skeleton panel-skeleton-filters" aria-hidden="true">
+            <div class="skeleton-filters-header">
+              <span class="skeleton-block skeleton-pill skeleton-pill-md"></span>
+              <span class="skeleton-block skeleton-line skeleton-line-sm"></span>
+            </div>
+
+            <div class="skeleton-filters-row">
+              <div class="skeleton-field">
+                <span class="skeleton-block skeleton-line skeleton-line-xs"></span>
+                <span class="skeleton-block skeleton-input"></span>
+              </div>
+              <div class="skeleton-field">
+                <span class="skeleton-block skeleton-line skeleton-line-xs"></span>
+                <span class="skeleton-block skeleton-input"></span>
+              </div>
+            </div>
+          </div>
         </section>
 
         <section class="table-panel">
@@ -103,6 +149,51 @@
 
           <div class="table-scroll-shell">
             <div id="tableContainer"></div>
+          </div>
+
+          <div class="panel-skeleton panel-skeleton-table" aria-hidden="true">
+            <div class="skeleton-table-header">
+              <span class="skeleton-block skeleton-line skeleton-line-lg"></span>
+              <span class="skeleton-block skeleton-line skeleton-line-md"></span>
+            </div>
+
+            <div class="skeleton-table-shell">
+              <div class="skeleton-table-row skeleton-table-row-head">
+                <span class="skeleton-block skeleton-table-cell skeleton-table-cell-wide"></span>
+                <span class="skeleton-block skeleton-table-cell"></span>
+                <span class="skeleton-block skeleton-table-cell"></span>
+                <span class="skeleton-block skeleton-table-cell"></span>
+                <span class="skeleton-block skeleton-table-cell"></span>
+              </div>
+              <div class="skeleton-table-row">
+                <span class="skeleton-block skeleton-table-cell skeleton-table-cell-wide"></span>
+                <span class="skeleton-block skeleton-table-cell"></span>
+                <span class="skeleton-block skeleton-table-cell"></span>
+                <span class="skeleton-block skeleton-table-cell"></span>
+                <span class="skeleton-block skeleton-table-cell"></span>
+              </div>
+              <div class="skeleton-table-row">
+                <span class="skeleton-block skeleton-table-cell skeleton-table-cell-wide"></span>
+                <span class="skeleton-block skeleton-table-cell"></span>
+                <span class="skeleton-block skeleton-table-cell"></span>
+                <span class="skeleton-block skeleton-table-cell"></span>
+                <span class="skeleton-block skeleton-table-cell"></span>
+              </div>
+              <div class="skeleton-table-row">
+                <span class="skeleton-block skeleton-table-cell skeleton-table-cell-wide"></span>
+                <span class="skeleton-block skeleton-table-cell"></span>
+                <span class="skeleton-block skeleton-table-cell"></span>
+                <span class="skeleton-block skeleton-table-cell"></span>
+                <span class="skeleton-block skeleton-table-cell"></span>
+              </div>
+              <div class="skeleton-table-row">
+                <span class="skeleton-block skeleton-table-cell skeleton-table-cell-wide"></span>
+                <span class="skeleton-block skeleton-table-cell"></span>
+                <span class="skeleton-block skeleton-table-cell"></span>
+                <span class="skeleton-block skeleton-table-cell"></span>
+                <span class="skeleton-block skeleton-table-cell"></span>
+              </div>
+            </div>
           </div>
         </section>
       </main>

@@ -25,6 +25,8 @@ const state = {
   allItems: [],
   filteredItems: [],
   summary: {},
+  vehicleDetails: new Map(),
+  equipmentFacetsPromise: null,
   searchQuery: '',
   selectedEquipmentSlugs: [],
   equipmentSearchQuery: '',
@@ -131,6 +133,19 @@ function escapeHtml(value) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
+}
+
+function textArrayFormatter(values) {
+  const text = Array.isArray(values)
+    ? (values.length ? values.join(', ') : null)
+    : (typeof values === 'string' && values.trim() ? values.trim() : null);
+  return `<span class="cell-clamp">${text ? escapeHtml(text) : 'â€”'}</span>`;
+}
+
+function getEquipmentCount(rowData) {
+  const standardCount = Number(rowData && rowData.standardEquipmentCount) || 0;
+  const additionalCount = Number(rowData && rowData.additionalEquipmentCount) || 0;
+  return standardCount + additionalCount;
 }
 
 function getTooltipTarget(node) {
@@ -332,6 +347,39 @@ function updateEquipmentModalStatus(message, isError = false) {
   node.style.color = isError ? 'var(--danger)' : '';
 }
 
+async function openEquipmentModal(rowData) {
+  equipEdit.vehicleId = rowData.id;
+  equipEdit.tab = 'standard';
+  equipEdit.standard = [];
+  equipEdit.additional = [];
+
+  document.getElementById('equipmentModalTitle').textContent = rowData.displayName || 'WyposaĹĽenie';
+  renderEquipmentTabButtons();
+  renderEquipmentItems();
+  updateEquipmentModalStatus('Ładowanie wyposażenia…');
+  document.getElementById('equipmentNewItem').value = '';
+
+  document.getElementById('equipmentModal').classList.add('is-open');
+  document.getElementById('equipmentModal').setAttribute('aria-hidden', 'false');
+  setOverlay('equipModal');
+
+  try {
+    const details = await fetchVehicleDetails(rowData.id);
+    if (equipEdit.vehicleId !== rowData.id) {
+      return;
+    }
+
+    equipEdit.standard = [...(details.standardEquipment || [])];
+    equipEdit.additional = [...(details.additionalEquipment || [])];
+    document.getElementById('equipmentModalTitle').textContent = details.displayName || rowData.displayName || 'WyposaĹĽenie';
+    renderEquipmentTabButtons();
+    renderEquipmentItems();
+    updateEquipmentModalStatus('');
+  } catch (error) {
+    updateEquipmentModalStatus(error.message, true);
+  }
+}
+
 function renderEquipmentTabButtons() {
   document.querySelectorAll('[data-equip-tab]').forEach((btn) => {
     btn.classList.toggle('is-active', btn.getAttribute('data-equip-tab') === equipEdit.tab);
@@ -465,7 +513,7 @@ function openConfiguration(rowData) {
   }
 }
 
-function showNotification(message, isError = false, duration = 3000) {
+function legacyShowNotification(message, isError = false, duration = 3000) {
   // Remove existing notifications
   const existingToasts = document.querySelectorAll('.toast-notification');
   existingToasts.forEach(toast => toast.remove());
@@ -484,6 +532,44 @@ function showNotification(message, isError = false, duration = 3000) {
   document.body.appendChild(toast);
 
   // Auto remove after duration
+  setTimeout(() => {
+    if (toast.parentElement) {
+      toast.remove();
+    }
+  }, duration);
+}
+
+function showNotification(message, isError = false, duration = 3000) {
+  const existingToasts = document.querySelectorAll('.toast-notification');
+  existingToasts.forEach((toast) => toast.remove());
+
+  const toast = document.createElement('div');
+  toast.className = `toast-notification ${isError ? 'toast-error' : 'toast-success'}`;
+
+  const content = document.createElement('div');
+  content.className = 'toast-content';
+
+  const icon = document.createElement('span');
+  icon.className = 'toast-icon';
+  icon.textContent = isError ? '\u26A0\uFE0F' : '\u2705';
+
+  const text = document.createElement('span');
+  text.className = 'toast-message';
+  text.textContent = String(message || (isError ? 'Wyst\u0105pi\u0142 b\u0142\u0105d.' : 'Zapisano zmiany.'));
+
+  const close = document.createElement('button');
+  close.type = 'button';
+  close.className = 'toast-close';
+  close.setAttribute('aria-label', 'Zamknij powiadomienie');
+  close.textContent = '\u00D7';
+  close.addEventListener('click', () => {
+    toast.remove();
+  });
+
+  content.append(icon, text);
+  toast.append(content, close);
+  document.body.appendChild(toast);
+
   setTimeout(() => {
     if (toast.parentElement) {
       toast.remove();
@@ -1122,7 +1208,7 @@ function packagesFormatter(cell) {
 
 function equipActionFormatter(cell) {
   const data = cell.getRow().getData();
-  const count = (data.standardEquipment || []).length + (data.additionalEquipment || []).length;
+  const count = getEquipmentCount(data);
   return `<button class="equip-action-btn" type="button" aria-label="Edytuj wyposażenie" data-ui-tooltip="Edytuj wyposażenie">✏️ ${count} poz.</button>`;
 }
 
@@ -1648,6 +1734,10 @@ function updateImportStatus(message, isError = false) {
   node.style.color = isError ? 'var(--danger)' : '';
 }
 
+function setPageLoading(isLoading) {
+  document.body.classList.toggle('is-page-loading', Boolean(isLoading));
+}
+
 function updateSummary(items) {
   const topCarName = document.getElementById('topCarName');
   const topCarMeta = document.getElementById('topCarMeta');
@@ -1748,6 +1838,7 @@ function renderEquipmentSelect() {
   const labelNode = document.getElementById('equipmentSelectLabel');
   const query = state.equipmentSearchQuery.trim().toLowerCase();
   const facets = getEquipmentFacets();
+  const isLoading = Boolean(state.equipmentFacetsPromise) && !facets.length;
   const visibleFacets = facets.filter((facet) =>
     !query || facet.label.toLowerCase().includes(query)
   );
@@ -1772,7 +1863,9 @@ function renderEquipmentSelect() {
     })
     .join('');
 
-  optionsNode.innerHTML = visibleFacets.length
+  optionsNode.innerHTML = isLoading
+    ? '<div class="empty-state">Ładowanie listy wyposażenia...</div>'
+    : visibleFacets.length
     ? visibleFacets
         .map((facet) => {
           const isSelected = state.selectedEquipmentSlugs.includes(facet.slug);
@@ -1803,6 +1896,9 @@ function applyFilters() {
   const selectedEquipment = state.selectedEquipmentSlugs;
 
   state.filteredItems = state.allItems.filter((item) => {
+    const allEquipmentText = Array.isArray(item.allEquipment)
+      ? item.allEquipment.join(' ')
+      : (item.allEquipment || '');
     const searchPool = [
       item.displayName,
       item.brand,
@@ -1811,7 +1907,7 @@ function applyFilters() {
       item.exteriorColor,
       item.wheels,
       item.interiorTrim,
-      ...(item.allEquipment || []),
+      allEquipmentText,
     ]
       .filter(Boolean)
       .join(' ')
@@ -1997,10 +2093,54 @@ async function readApiPayload(response, fallbackMessage) {
   throw error;
 }
 
+async function fetchVehicleDetails(vehicleId) {
+  if (state.vehicleDetails.has(vehicleId)) {
+    return state.vehicleDetails.get(vehicleId);
+  }
+
+  const response = await fetch(`/api/vehicles/${encodeURIComponent(vehicleId)}`);
+  const payload = await readApiPayload(response, 'Nie udało się pobrać szczegółów konfiguracji.');
+  const vehicle = payload.vehicle || null;
+
+  if (!vehicle) {
+    throw new Error('Nie znaleziono szczegółów konfiguracji.');
+  }
+
+  state.vehicleDetails.set(vehicleId, vehicle);
+  return vehicle;
+}
+
+async function ensureEquipmentFacetsLoaded() {
+  if ((state.summary.equipmentFacets || []).length) {
+    return state.summary.equipmentFacets;
+  }
+
+  if (state.equipmentFacetsPromise) {
+    return state.equipmentFacetsPromise;
+  }
+
+  state.equipmentFacetsPromise = (async () => {
+    const response = await fetch('/api/equipment-facets');
+    const payload = await readApiPayload(response, 'Nie udało się pobrać listy wyposażenia.');
+    const items = Array.isArray(payload.items) ? payload.items : [];
+    state.summary = { ...state.summary, equipmentFacets: items };
+    renderEquipmentSelect();
+    return items;
+  })();
+  renderEquipmentSelect();
+
+  try {
+    return await state.equipmentFacetsPromise;
+  } finally {
+    state.equipmentFacetsPromise = null;
+  }
+}
+
 async function loadCars() {
   const response = await fetch('/api/cars');
   const payload = await readApiPayload(response, 'Nie udalo sie pobrac tabeli.');
 
+  state.vehicleDetails.clear();
   state.allItems = payload.items || [];
   state.summary = payload.summary || {};
   applyFilters();
@@ -2320,6 +2460,74 @@ function closePreviewModal() {
   if (state.activeOverlay === 'previewModal') setOverlay(null);
 }
 
+function renderPreviewModalBody(rowData, options = {}) {
+  const { loadingDetails = false } = options;
+  const rows = [
+    ['Marka', rowData.brand],
+    ['Model', rowData.model],
+    ['Wersja', rowData.versionName],
+    ['Kolor', rowData.exteriorColor],
+    ['Cena koĹ„cowa', rowData.totalPricePln != null ? currencyFormatter(rowData.totalPricePln) : null],
+    ['ZasiÄ™g WLTP', rowData.rangeWltpKm != null ? numberFormatter(rowData.rangeWltpKm, 'km') : null],
+    ['Bateria', rowData.batteryCapacityKwh != null ? numberFormatter(rowData.batteryCapacityKwh, 'kWh') : null],
+    ['Moc', rowData.powerHp != null ? numberFormatter(rowData.powerHp, 'KM') : null],
+    ['ZuĹĽycie', rowData.energyConsumptionKwh100km != null ? numberFormatter(rowData.energyConsumptionKwh100km, 'kWh/100 km') : null],
+    ['Moment obrotowy', rowData.torqueNm != null ? numberFormatter(rowData.torqueNm, 'Nm') : null],
+    ['Felgi', rowData.wheels],
+    ['WnÄ™trze', rowData.interiorTrim],
+    ['COâ‚‚', rowData.co2EmissionGkm != null ? numberFormatter(rowData.co2EmissionGkm, 'g/km') : null],
+    ['Homologacja', rowData.homologationStandard],
+    ['Kod konfiguracji', rowData.configurationCode],
+    ['Data konfiguracji', rowData.sourceDate],
+  ].filter(([, value]) => value != null && value !== '');
+
+  const equipRows = [
+    ['WyposaĹĽenie seryjne', rowData.standardEquipment],
+    ['Opcje dodatkowe', rowData.additionalEquipment],
+    ['Pakiety', rowData.equipmentPackages],
+  ].filter(([, items]) => Array.isArray(items) && items.length);
+
+  const loadingMarkup = loadingDetails
+    ? '<p class="status-message">Ładowanie pełnej listy wyposażenia…</p>'
+    : '';
+
+  const body = document.getElementById('previewModalBody');
+  body.innerHTML = `
+    <dl class="preview-dl">
+      ${rows.map(([key, value]) => `<dt>${escapeHtml(key)}</dt><dd>${escapeHtml(String(value))}</dd>`).join('')}
+    </dl>
+    ${loadingMarkup}
+    ${equipRows.map(([heading, items]) => `
+      <details class="preview-equip">
+        <summary>${escapeHtml(heading)} <span class="preview-equip-count">(${items.length})</span></summary>
+        <ul>${items.map((item) => `<li>${escapeHtml(String(item))}</li>`).join('')}</ul>
+      </details>`).join('')}
+  `;
+}
+
+async function openPreviewModal(rowData) {
+  const name = [rowData.brand, rowData.model, rowData.versionName].filter(Boolean).join(' ') || rowData.displayName || 'Konfiguracja';
+  document.getElementById('previewModalTitle').textContent = name;
+  renderPreviewModalBody(rowData, { loadingDetails: true });
+
+  const modal = document.getElementById('previewModal');
+  modal.classList.add('is-open');
+  modal.setAttribute('aria-hidden', 'false');
+  setOverlay('previewModal');
+  document.getElementById('closePreviewButton').focus();
+
+  try {
+    const details = await fetchVehicleDetails(rowData.id);
+    if (state.activeOverlay !== 'previewModal') {
+      return;
+    }
+
+    renderPreviewModalBody({ ...rowData, ...details }, { loadingDetails: false });
+  } catch (_error) {
+    renderPreviewModalBody(rowData, { loadingDetails: false });
+  }
+}
+
 function bindEvents() {
   document.getElementById('searchInput').addEventListener('input', (event) => {
     state.searchQuery = event.target.value || '';
@@ -2341,7 +2549,11 @@ function bindEvents() {
   });
 
   document.getElementById('equipmentSelectButton').addEventListener('click', () => {
-    setEquipmentDropdownOpen(!state.equipmentDropdownOpen);
+    const nextOpen = !state.equipmentDropdownOpen;
+    setEquipmentDropdownOpen(nextOpen);
+    if (nextOpen) {
+      void ensureEquipmentFacetsLoaded().catch(() => {});
+    }
   });
 
   document.getElementById('equipmentSearchInput').addEventListener('input', (event) => {
@@ -2475,12 +2687,15 @@ function bindEvents() {
 async function init() {
   bindEvents();
   bindTooltipEvents();
+  setPageLoading(true);
 
   try {
     await loadCars();
     updateStatus('Gotowe.');
   } catch (error) {
     updateStatus(error.message, true);
+  } finally {
+    setPageLoading(false);
   }
 }
 
