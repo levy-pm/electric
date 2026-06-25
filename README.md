@@ -1,145 +1,137 @@
-# electric
+# ⚡ electric
 
-Lekki panel Node.js do porownywania konfiguracji aut elektrycznych z PDF-ow konfiguratora.
+**Porównywarka aut elektrycznych z konfiguratorów PDF, linków i wpisu ręcznego.**
+
+Wgrywasz konfigurację samochodu elektrycznego (PDF z dowolnego konfiguratora producenta, link do konfiguracji online albo dane wpisane ręcznie), a aplikacja wyciąga z niej kluczowe parametry, zapisuje je w jednej tabeli i tworzy ranking „najlepsza wartość za pieniądze”. Ceny pokazywane są w PLN i EUR po aktualnym kursie NBP.
+
+Aplikacja jest celowo oznaczona jako `noindex` – niewidoczna dla wyszukiwarek.
+
+---
+
+## Spis treści
+
+- [Co robi aplikacja](#co-robi-aplikacja)
+- [Jak to działa](#jak-to-działa)
+- [Szybki start](#szybki-start)
+- [Konfiguracja (zmienne środowiskowe)](#konfiguracja-zmienne-środowiskowe)
+- [Skrypty npm](#skrypty-npm)
+- [Stos technologiczny](#stos-technologiczny)
+- [Dokumentacja](#dokumentacja)
+
+---
 
 ## Co robi aplikacja
 
-- przyjmuje PDF konfiguratora bez logowania
-- wysyla plik do Gemini File API i wyciaga dane do jednego rekordu tabeli
-- zapisuje rekordy w MariaDB lub w trybie lokalnym `memory`
-- trzyma wyposazenie takze w katalogu relacyjnym `equipment_items` + `vehicle_equipment`
-- pokazuje ranking po cenie, zasiegu, baterii i wyposazeniu
-- przelicza ceny EUR/PLN po kursie NBP i pokazuje EUR pod cena w PLN
-- pozwala sortowac, filtrowac, szukac, ukrywac i przestawiac kolumny
-- ustawia `noindex` przez `meta robots` i `X-Robots-Tag`
+- **Trzy drogi dodania auta** – PDF konfiguratora, link do konfiguracji online, formularz ręczny.
+- **Automatyczne wyciąganie danych** – PDF i tekst stron analizuje Gemini, zwraca ustrukturyzowany rekord (cena, moc, zasięg WLTP, bateria, zużycie energii, wyposażenie).
+- **Dedykowane parsery** – konfiguratory Honda i Ford są czytane bezpośrednio z ich API (bez Gemini), reszta linków idzie przez ekstrakcję tekstu HTML.
+- **Ranking „value for money”** – pojazdy są sortowane wg ilości zasięgu, baterii i wyposażenia w przeliczeniu na 1000 PLN, z bonusem za niskie zużycie energii.
+- **Odznaki liderów** – najlepsza cena, największy zasięg, największa bateria, największa moc, najbogatsze wyposażenie.
+- **Ceny PLN + EUR** – kurs EUR pobierany z NBP (tabela A), z cache i fallbackiem na ostatnią znaną wartość.
+- **Katalog wyposażenia** – każda pozycja jest kanonizowana i przechowywana relacyjnie, dzięki czemu można filtrować pojazdy po konkretnych funkcjach.
+- **Interaktywna tabela** – sortowanie, wyszukiwanie, filtr po wyposażeniu, ukrywanie i przestawianie kolumn (układ zapisywany lokalnie), edycja inline i usuwanie rekordów.
+- **Porównanie ze spalinowymi** – Gemini dobiera 3–5 odpowiedników spalinowych dla każdego auta.
+- **Prywatność domyślnie** – `noindex` przez `meta robots`, nagłówek `X-Robots-Tag` i `robots.txt` blokujący indeksowanie.
+- **Warstwa bezpieczeństwa** – nagłówki bezpieczeństwa (CSP, HSTS, anty-clickjacking), wielopoziomowy rate limiting (API / zapis / upload), ochrona przed SSRF przy imporcie z linku, twarde limity rozmiaru żądań i plików. Szczegóły: [docs/dokumentacja-techniczna.md › Bezpieczeństwo](docs/dokumentacja-techniczna.md#9-bezpieczeństwo-i-odporność).
 
-## Stack
+## Jak to działa
 
-- Node.js 20
-- Express
-- MariaDB 10.6 na hostingu
-- Gemini Developer API przez `@google/genai`
-- Tabulator na froncie
-
-## Zmienne srodowiskowe
-
-Skopiuj `.env.example` do `.env` i uzupelnij:
-
-```env
-PORT=3000
-DB_MODE=memory
-DB_HOST=localhost
-DB_PORT=3306
-DB_NAME=
-DB_USER=
-DB_PASSWORD=
-GEMINI_API_KEYS=
-GEMINI_API_KEY=
-GEMINI_MODEL=gemini-2.5-flash
-GEMINI_BUSY_RETRY_ATTEMPTS=3
-GEMINI_BUSY_RETRY_BASE_DELAY_MS=5000
-NBP_CACHE_TTL_MINUTES=720
-NBP_REQUEST_TIMEOUT_MS=8000
-MAX_FILE_SIZE_MB=20
-SYNC_BRANCH=main
+```
+PDF / link / formularz
+        │
+        ▼
+   /api/upload*, /api/import-url, /api/manual
+        │
+        ▼
+  Ekstrakcja danych
+  • PDF  → Gemini File API
+  • link → parser Honda/Ford albo tekst HTML → Gemini
+  • ręcznie → walidacja pól
+        │
+        ▼
+  Normalizacja (schema.js) + kanonizacja wyposażenia (equipment.js)
+        │
+        ▼
+  Zapis: MariaDB albo tryb pamięciowy (memory)
+        │
+        ▼
+  /api/cars → wzbogacenie o kurs NBP + scoring → tabela na froncie
 ```
 
-`GEMINI_API_KEYS` przyjmuje liste kluczy rozdzielonych przecinkami i ma priorytet nad pojedynczym `GEMINI_API_KEY`. Aplikacja probuje klucze po kolei, gdy poprzedni dostanie limit albo powtarzajace sie bledy `429/503`.
+## Szybki start
 
-## Uruchomienie lokalne
+Wymagany Node.js ≥ 20.
 
 ```bash
 npm install
+cp .env.example .env   # uzupełnij GEMINI_API_KEY
 npm run dev
 ```
 
-Domyslnie bez bazy aplikacja startuje w trybie `memory`. Na serwerze ustaw `DB_MODE=mariadb`.
+Aplikacja wystartuje na `http://localhost:3000`. Bez ustawionej bazy działa w trybie **memory** (dane znikają po restarcie) – idealne do testów. Do realnego użycia ustaw `DB_MODE=mariadb` i dane połączenia.
 
-## Deploy na DirectAdmin
+Bez klucza Gemini front i tabela działają, ale import PDF/linku zwróci błąd. Wpis ręczny nie potrzebuje Gemini.
 
-1. W panelu przejdz do `Bazy danych` i utworz baze np. `problems_electric`.
-2. W `Setup Node.js App` utworz aplikacje dla `electric.motometr.pl`.
-3. Jako `Application root` ustaw katalog projektu: `/home/problems/domains/electric.motometr.pl/public_html`.
-4. Jako `Startup file` ustaw `server.js`.
-5. W `.env` wpisz dane MariaDB i klucz Gemini.
-6. Zainstaluj zaleznosci:
+## Konfiguracja (zmienne środowiskowe)
 
-```bash
-npm install --omit=dev
-```
+Skopiuj `.env.example` do `.env` i uzupełnij:
 
-7. Dodaj cron:
+| Zmienna | Domyślnie | Opis |
+|---|---|---|
+| `PORT` | `3000` | Port serwera HTTP. |
+| `DB_MODE` | `memory` (lub `mariadb`, gdy podano `DB_NAME`) | Tryb składowania danych. |
+| `DB_HOST` / `DB_PORT` | `localhost` / `3306` | Połączenie z MariaDB. |
+| `DB_SOCKET_PATH` | – | Gniazdo zamiast host/port (opcjonalnie). |
+| `DB_NAME` / `DB_USER` / `DB_PASSWORD` | – | Dane bazy (wymagane przy `mariadb`). |
+| `GEMINI_API_KEYS` | – | Lista kluczy po przecinku; ma priorytet nad `GEMINI_API_KEY`. |
+| `GEMINI_API_KEY` | – | Pojedynczy klucz Gemini. |
+| `GEMINI_MODEL` | `gemini-2.5-flash` | Model używany do analizy. |
+| `GEMINI_BUSY_RETRY_ATTEMPTS` | `3` | Liczba ponowień przy `429/503`. |
+| `GEMINI_BUSY_RETRY_BASE_DELAY_MS` | `5000` | Bazowe opóźnienie ponowienia (backoff wykładniczy). |
+| `NBP_CACHE_TTL_MINUTES` | `720` | Czas życia cache kursu EUR. |
+| `NBP_REQUEST_TIMEOUT_MS` | `8000` | Timeout zapytania do NBP. |
+| `MAX_FILE_SIZE_MB` | `20` | Maksymalny rozmiar wgrywanego PDF. |
+| `UPLOAD_RATE_LIMIT_WINDOW_MS` | `900000` | Okno limitu uploadów (15 min). |
+| `UPLOAD_RATE_LIMIT_MAX` | `20` | Maks. liczba uploadów w oknie. |
+| `API_RATE_LIMIT_WINDOW_MS` | `60000` | Okno globalnego limitu API. |
+| `API_RATE_LIMIT_MAX` | `120` | Maks. liczba żądań API na okno (per IP). |
+| `WRITE_RATE_LIMIT_WINDOW_MS` | `60000` | Okno limitu operacji zapisu. |
+| `WRITE_RATE_LIMIT_MAX` | `30` | Maks. liczba zapisów (PATCH/DELETE/complete) na okno. |
+| `JSON_BODY_LIMIT` | `256kb` | Maksymalny rozmiar ciała żądania JSON. |
+| `TRUST_PROXY` | `1` | Liczba zaufanych proxy (poprawne IP klienta za Passengerem). |
+| `URL_IMPORT_MAX_BYTES` | `8388608` | Limit rozmiaru pobieranej treści z linku (8 MB). |
+| `URL_IMPORT_ALLOW_PRIVATE` | `false` | Zezwól na linki do adresów prywatnych (tylko dev). |
+| `SYNC_BRANCH` | `main` | Gałąź synchronizowana przez deploy. |
 
-```cron
-* * * * * cd /home/problems/domains/electric.motometr.pl/public_html && /bin/bash scripts/pull-and-build.sh >> storage/logs/deploy.log 2>&1
-```
+`GEMINI_API_KEYS` przyjmuje listę kluczy rozdzielonych przecinkami. Aplikacja próbuje klucze po kolei, gdy poprzedni dostanie limit albo powtarzające się błędy `429/503`.
 
-Skrypt:
+## Skrypty npm
 
-- blokuje rownolegle uruchomienia deploya
-- robi `git fetch` + `git reset --hard origin/main` + `git clean -fd`, wiec sam leczy `dirty repo` na serwerze
-- dogrywa zaleznosci przez `npm ci --omit=dev`
-- restartuje Passenger przez `tmp/restart.txt`
-- zapisuje stan ostatniego deploya do `tmp/deploy-meta.json`
+| Komenda | Działanie |
+|---|---|
+| `npm run dev` | Serwer z auto-restartem (`node --watch`). |
+| `npm start` | Serwer produkcyjny. |
+| `npm run check` | Walidacja konfiguracji bez startu (dopuszcza brak Gemini). |
+| `npm test` | Testy jednostkowe (`node --test`). |
+| `npm run test:ux` | Testy UX w Playwright (`test/ux.test.js`). |
+| `npm run import:pdfs -- <ścieżki>` | Masowy import PDF z CLI. |
+| `npm run deploy:sync` | Wymuszenie synchronizacji z gałęzią produkcyjną. |
+| `npm run deploy:status` | Status ostatniego deploya. |
 
-Do recznej diagnostyki z panelu Node.js mozesz uruchomic:
+## Stos technologiczny
 
-```bash
-npm run deploy:status
-```
+Node.js 20 · Express 5 · MariaDB 10.6 (mysql2) · Gemini Developer API (`@google/genai`) · Multer · Zod · express-rate-limit · Tabulator (front) · Playwright (testy UX). Szczegóły: [docs/stos-technologiczny.md](docs/stos-technologiczny.md).
 
-Na Windows skrypt szuka `Git Bash` albo zmiennej `GIT_BASH`. Na serwerze Linux dziala bez dodatkowej konfiguracji.
+## Dokumentacja
 
-Do jednorazowego wymuszenia synchronizacji:
+Pełna dokumentacja znajduje się w katalogu [`docs/`](docs/):
 
-```bash
-npm run deploy:sync
-```
+- [Specyfikacja](docs/specyfikacja.md) – wymagania, zakres, model danych, reguły biznesowe.
+- [Dokumentacja użytkownika](docs/dokumentacja-uzytkownika.md) – jak korzystać z aplikacji krok po kroku.
+- [Dokumentacja techniczna](docs/dokumentacja-techniczna.md) – architektura, moduły, API, baza, deploy.
+- [Stos technologiczny](docs/stos-technologiczny.md) – zależności i uzasadnienie wyborów.
+- [Regressions](docs/REGRESSIONS.md) – rejestr naprawionych regresji i znanych pułapek.
 
-## API
+## Licencja
 
-- `GET /api/cars` - rekordy do tabeli
-- `POST /api/upload` - upload jednego PDF-a pod polem `configurationPdf`
-- `POST /api/upload-async` - asynchroniczny upload jednego PDF-a pod polem `configurationPdf`
-- `GET /api/uploads/:uploadId/status` - status przetwarzania uploadu i gotowe rekordy
-- `POST /api/uploads/:uploadId/complete` - zapisuje gotowy wynik parsowania dla istniejącego uploadu
-- `GET /api/config` - podstawowa konfiguracja klienta
-- `GET /healthz` - prosty healthcheck + status ostatniego deploya
-
-`GET /api/cars` wzbogaca rekordy o kurs EUR z NBP i pola `totalPriceEur` / `basePriceEur`.
-
-Import PDF automatycznie ponawia chwilowe bledy `503/UNAVAILABLE` z Gemini. Gdy ustawisz `GEMINI_API_KEYS`, po wyczerpaniu limitu albo przeciążeniu jednego klucza aplikacja przejdzie do kolejnego. Limity ponowien ustawisz przez `GEMINI_BUSY_RETRY_ATTEMPTS` i `GEMINI_BUSY_RETRY_BASE_DELAY_MS`.
-
-## Import wielu PDF-ow
-
-Frontend pozwala wybrac kilka PDF-ow naraz i wysyla je sekwencyjnie po istniejacym `/api/upload-async`, wiec nie trzeba zmieniac kontraktu API.
-
-Jesli chcesz zaladowac konfiguracje bezposrednio na serwerze, bez przegladarki, uzyj skryptu CLI:
-
-```bash
-npm run import:pdfs -- /sciezka/do/katalogu-z-pdf
-```
-
-Mozesz tez podac kilka plikow lub katalogow:
-
-```bash
-npm run import:pdfs -- "/home/problems/tmp/x1.pdf" "/home/problems/tmp/x2.pdf"
-```
-
-Skrypt:
-
-- kopiuje PDF-y do `storage/uploads`
-- tworzy rekord `uploads` w bazie
-- parsuje pliki tym samym flow Gemini co aplikacja webowa
-- zapisuje rekordy `vehicles` i oznacza import jako `completed` albo `failed`
-
-## Logika rekomendacji
-
-Domyslny ranking MVP:
-
-- cena: `40%`
-- zasieg WLTP: `30%`
-- bateria: `15%`
-- wyposazenie: `15%`
-
-Bateria ma mniejsza wage niz zasieg, bo w praktyce czesciowo opisuje ten sam benefit. Wyposazenie jest osobno katalogowane, wiec mozna potem dodac osobne wartosciowanie i filtry po konkretnych funkcjach.
+ISC.
