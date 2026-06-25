@@ -77,12 +77,59 @@ function toClientVehicle(vehicle, rateInfo = null) {
   }, rateInfo);
 }
 
-function createSummary(payload, equipmentFacets, rateInfo = null) {
+function toClientVehicleListItem(vehicle) {
+  return {
+    id: vehicle.id,
+    uploadId: vehicle.uploadId,
+    brand: vehicle.brand,
+    model: vehicle.model,
+    versionName: vehicle.versionName,
+    displayName: vehicle.displayName,
+    totalPricePln: vehicle.totalPricePln,
+    totalPriceEur: vehicle.totalPriceEur,
+    basePricePln: vehicle.basePricePln,
+    basePriceEur: vehicle.basePriceEur,
+    powerKw: vehicle.powerKw,
+    powerHp: vehicle.powerHp,
+    torqueNm: vehicle.torqueNm,
+    rangeWltpKm: vehicle.rangeWltpKm,
+    batteryCapacityKwh: vehicle.batteryCapacityKwh,
+    energyConsumptionKwh100km: vehicle.energyConsumptionKwh100km,
+    seats: vehicle.seats,
+    fuelType: vehicle.fuelType,
+    homologationStandard: vehicle.homologationStandard,
+    co2EmissionGkm: vehicle.co2EmissionGkm,
+    exteriorColor: vehicle.exteriorColor,
+    wheels: vehicle.wheels,
+    interiorTrim: vehicle.interiorTrim,
+    configurationCode: vehicle.configurationCode,
+    sourceDate: vehicle.sourceDate,
+    combustionEquivalents: vehicle.combustionEquivalents,
+    equipmentPackages: vehicle.equipmentPackages,
+    notes: vehicle.notes,
+    additionalEquipmentCount: vehicle.additionalEquipmentCount,
+    standardEquipmentCount: vehicle.standardEquipmentCount,
+    equipmentPackagesCount: vehicle.equipmentPackagesCount,
+    allEquipment: Array.isArray(vehicle.allEquipment) ? vehicle.allEquipment.join(', ') : vehicle.allEquipment,
+    equipmentSlugs: vehicle.equipmentSlugs,
+    configurationDownloadUrl: vehicle.configurationDownloadUrl,
+    configurationSourceUrl: vehicle.configurationSourceUrl,
+    exchangeRateEurPln: vehicle.exchangeRateEurPln,
+    exchangeRateEffectiveDate: vehicle.exchangeRateEffectiveDate,
+    exchangeRateTableNo: vehicle.exchangeRateTableNo,
+    exchangeRateIsStale: vehicle.exchangeRateIsStale,
+    recommendationBadges: vehicle.recommendationBadges,
+    isSuggestedTop: vehicle.isSuggestedTop,
+    createdAt: vehicle.createdAt,
+  };
+}
+
+function createSummary(payload, rateInfo = null) {
   return {
     topRecommendation: payload.items[0] || null,
     leaders: payload.leaders,
     totalRows: payload.items.length,
-    equipmentFacets,
+    equipmentFacets: [],
     exchangeRate: rateInfo
       ? {
           code: rateInfo.code,
@@ -263,15 +310,33 @@ async function createApp() {
   });
 
   app.get('/api/cars', asyncRoute(async (_req, res) => {
-    const vehicles = await store.listVehicles();
-    const equipmentFacets = await store.listEquipmentFacets();
-    const rateInfo = await getEurExchangeRate();
+    const [vehicles, rateInfo] = await Promise.all([
+      store.listVehicles(),
+      getEurExchangeRate(),
+    ]);
     const ranked = enrichVehicles(vehicles.map((vehicle) => toClientVehicle(vehicle, rateInfo)));
+    const items = ranked.items.map(toClientVehicleListItem);
 
     res.json({
-      items: ranked.items,
-      summary: createSummary(ranked, equipmentFacets, rateInfo),
+      items,
+      summary: createSummary({ items, leaders: ranked.leaders }, rateInfo),
     });
+  }));
+
+  app.get('/api/equipment-facets', asyncRoute(async (_req, res) => {
+    const items = await store.listEquipmentFacets();
+    res.json({ items });
+  }));
+
+  app.get('/api/vehicles/:id', asyncRoute(async (req, res) => {
+    const vehicle = await store.getVehicleById(req.params.id);
+    if (!vehicle) {
+      res.status(404).json({ error: 'Nie znaleziono pojazdu.' });
+      return;
+    }
+
+    const rateInfo = await getEurExchangeRate();
+    res.json({ vehicle: toClientVehicle(vehicle, rateInfo) });
   }));
 
   app.get('/api/uploads/:uploadId/file', asyncRoute(async (req, res) => {
