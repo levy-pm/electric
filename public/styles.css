@@ -1,14 +1,7 @@
-/* ============================================================
-   ELECTRIC MOTOMETR — Eco Premium Design System v2
-   Modern · Ecological · Dynamic · Exclusive · Nature-inspired
-   ============================================================ */
-
-/* === DESIGN TOKENS === */
-
 :root {
   color-scheme: light;
 
-  /* Surfaces */
+
   --bg: #edf8f2;
   --bg-accent: #e2f4ea;
   --surface: rgba(255, 255, 255, 0.97);
@@ -16,34 +9,34 @@
   --surface-muted: #f2faf6;
   --surface-glass: rgba(255, 255, 255, 0.75);
 
-  /* Borders */
+
   --line: #bde0cc;
   --line-strong: #99c9b0;
 
-  /* Text */
+
   --text: #0c3322;
   --muted: #3e6150;
 
-  /* Brand greens */
+
   --accent: #059669;
   --accent-strong: #047857;
   --accent-soft: #c6f0d8;
   --eco-green: #16a34a;
   --eco-light: #d0f5e2;
 
-  /* Deep forest (dark UI elements) */
+
   --forest: #064e3b;
   --forest-mid: #0a5f47;
 
-  /* Solar gold — exclusivity accent */
+
   --sun: #d97706;
   --sun-soft: #fef3c7;
 
-  /* Utility */
+
   --nature-brown: #7c5028;
   --danger: #dc2626;
 
-  /* Shadows — organic, layered, eco-tinted */
+
   --shadow:
     0 2px 6px rgba(6, 78, 59, 0.05),
     0 8px 28px rgba(6, 78, 59, 0.09),
@@ -52,18 +45,18 @@
     0 1px 3px rgba(6, 78, 59, 0.06),
     0 4px 14px rgba(6, 78, 59, 0.09);
 
-  /* Geometry */
+
   --radius-xl: 24px;
   --radius-lg: 18px;
   --radius-md: 12px;
   --radius-sm: 8px;
 
-  /* Motion — organic spring + smooth */
+
   --ease-eco: cubic-bezier(0.34, 1.56, 0.64, 1);
   --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* === BASE RESET === */
+
 
 *,
 *::before,
@@ -78,7 +71,7 @@ body {
   overflow-x: hidden;
 }
 
-/* === BODY — organic topology background === */
+
 
 body {
   font-family: 'Outfit', 'Segoe UI', system-ui, sans-serif;
@@ -98,7 +91,7 @@ body.has-overlay {
   overflow: hidden;
 }
 
-/* === TYPOGRAPHY — headings use Space Grotesk === */
+
 
 h1,
 h2,
@@ -115,7 +108,7 @@ button {
   border: 0;
 }
 
-/* === LAYOUT === */
+
 
 .page-shell {
   width: min(100%, 1600px);
@@ -123,7 +116,7 @@ button {
   padding: 16px;
 }
 
-/* === SHARED SURFACES === */
+
 
 .topbar,
 .summary-panel,
@@ -135,7 +128,7 @@ button {
   box-shadow: var(--shadow);
 }
 
-/* === TOPBAR === */
+
 
 .topbar {
   position: relative;
@@ -150,7 +143,7 @@ button {
   animation: fadeInUp 0.45s var(--ease-smooth) both;
 }
 
-/* Eco-gradient top border accent */
+
 .topbar::before {
   content: '';
   position: absolute;
@@ -162,7 +155,7 @@ button {
   border-radius: var(--radius-xl) var(--radius-xl) 0 0;
 }
 
-/* Subtle sun glow in top-right corner */
+
 .topbar::after {
   content: '';
   position: absolute;
@@ -175,7 +168,7 @@ button {
   pointer-events: none;
 }
 
-/* === HEADINGS === */
+
 
 .brand-block h1,
 .hero-card h2,
@@ -189,7 +182,7 @@ button {
   line-height: 1.15;
 }
 
-/* Gradient text for main heading */
+
 .brand-block h1 {
   font-size: clamp(1.75rem, 4vw, 2.75rem);
   background: linear-gradient(140deg, var(--text) 0%, var(--forest-mid) 45%, var(--accent-strong) 100%);
@@ -217,7 +210,7 @@ button {
   font-size: 0.94rem;
 }
 
-/* === EYEBROW — with left accent stroke === */
+
 
 .eyebrow {
   display: inline-flex;
@@ -239,7 +232,7 @@ button {
   border-left-color: rgba(255, 255, 255, 0.55);
 }
 
-/* === HEADER ACTIONS === */
+
 
 .header-actions,
 .drawer-actions,
@@ -255,7 +248,7 @@ button {
   justify-content: flex-start;
 }
 
-/* === PAGE CONTENT === */
+
 
 .page-content {
   display: grid;
@@ -434,7 +427,7 @@ body.is-page-loading .page-content > * {
   border: 1px solid rgba(255, 255, 255, 0.85);
 }
 
-/* Staggered page-content entrance */
+
 .page-content > * {
   animation: fadeInUp 0.4s var(--ease-smooth) both;
 }
@@ -442,7 +435,7 @@ body.is-page-loading .page-content > * {
 .page-content > *:nth-child(2) { animation-delay: 0.13s; }
 .page-content > *:nth-child(3) { animation-delay: 0.20s; }
 
-/* === HERO CARD — flagship element === */
+
 
 .hero-card {
   padding: 28px;
@@ -455,7 +448,7 @@ body.is-page-loading .page-content > * {
   overflow: hidden;
 }
 
-/* Organic wave overlay */
+
 .hero-card::before {
   content: '';
   position: absolute;
@@ -468,7 +461,7 @@ body.is-page-loading .page-content > * {
   pointer-events: none;
 }
 
-/* Solar energy glow */
+
 .hero-card::after {
   content: '';
   position: absolute;
@@ -487,7 +480,7 @@ body.is-page-loading .page-content > * {
   margin-bottom: 2px;
 }
 
-/* === BADGE ROW + LEADER GRID === */
+
 
 .badge-row,
 .leader-grid,
@@ -508,7 +501,7 @@ body.is-page-loading .page-content > * {
   margin-top: 18px;
 }
 
-/* === LEADER CARDS — key stats === */
+
 
 .leader-card {
   position: relative;
@@ -520,7 +513,7 @@ body.is-page-loading .page-content > * {
   transition: transform 0.22s var(--ease-eco), box-shadow 0.2s var(--ease-smooth);
 }
 
-/* Gradient top accent line — replaces plain left border */
+
 .leader-card::before {
   content: '';
   position: absolute;
@@ -549,13 +542,13 @@ body.is-page-loading .page-content > * {
   font-family: 'Space Grotesk', 'Outfit', system-ui, sans-serif;
 }
 
-/* === TABLE PANEL === */
+
 
 .table-panel {
   min-width: 0;
 }
 
-/* === FILTERS BAR === */
+
 
 .filters-bar {
   background: var(--surface);
@@ -593,7 +586,7 @@ body.is-page-loading .page-content > * {
   min-width: 220px;
 }
 
-/* === PANEL HEADINGS === */
+
 
 .panel-heading,
 .panel-header,
@@ -609,14 +602,14 @@ body.is-page-loading .page-content > * {
   margin-bottom: 20px;
 }
 
-/* Subtle separator below table panel header */
+
 .table-panel > .panel-header {
   margin-bottom: 16px;
   padding-bottom: 16px;
   border-bottom: 1px solid var(--line);
 }
 
-/* === FIELDS === */
+
 
 .field {
   display: grid;
@@ -660,7 +653,7 @@ body.is-page-loading .page-content > * {
   box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.15);
 }
 
-/* === BUTTONS === */
+
 
 .primary-button,
 .secondary-button,
@@ -685,7 +678,7 @@ body.is-page-loading .page-content > * {
   letter-spacing: 0.01em;
 }
 
-/* Primary — vibrant eco gradient with shimmer */
+
 .primary-button {
   position: relative;
   overflow: hidden;
@@ -697,7 +690,7 @@ body.is-page-loading .page-content > * {
     inset 0 1px 0 rgba(255, 255, 255, 0.18);
 }
 
-/* Shimmer sweep on hover */
+
 .primary-button::after {
   content: '';
   position: absolute;
@@ -714,7 +707,7 @@ body.is-page-loading .page-content > * {
   left: 150%;
 }
 
-/* Secondary — glass with subtle border */
+
 .secondary-button {
   color: var(--text);
   background: var(--surface-glass);
@@ -723,7 +716,7 @@ body.is-page-loading .page-content > * {
   -webkit-backdrop-filter: blur(8px);
 }
 
-/* Danger — red destructive action */
+
 .danger-button {
   min-height: 52px;
   padding: 0 22px;
@@ -744,7 +737,7 @@ body.is-page-loading .page-content > * {
   box-shadow: 0 4px 18px rgba(220, 38, 38, 0.36);
 }
 
-/* === ACTION BUTTONS (kolumna Akcje w tabeli) === */
+
 
 .action-btns {
   display: flex;
@@ -775,7 +768,7 @@ body.is-page-loading .page-content > * {
 .action-btn--view:hover { background: rgba(5, 150, 105, 0.12); }
 .action-btn--delete:hover { background: rgba(220, 38, 38, 0.12); }
 
-/* === MODAL USUNIĘCIA === */
+
 
 .modal-panel--narrow {
   max-width: 440px;
@@ -787,7 +780,7 @@ body.is-page-loading .page-content > * {
   color: var(--text);
 }
 
-/* === MODAL PODGLĄDU === */
+
 
 .preview-body {
   margin-top: 16px;
@@ -848,6 +841,9 @@ body.is-page-loading .page-content > * {
 }
 
 .text-button {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
   padding: 0;
   color: var(--accent-strong);
   background: transparent;
@@ -859,7 +855,7 @@ body.is-page-loading .page-content > * {
   transition: text-decoration-color 0.16s ease, color 0.16s ease;
 }
 
-/* Hover states */
+
 .primary-button:hover {
   transform: translateY(-2px);
   box-shadow:
@@ -889,7 +885,7 @@ body.is-page-loading .page-content > * {
   transform: translateY(-1px);
 }
 
-/* === STATUS MESSAGE === */
+
 
 .status-message {
   max-width: 360px;
@@ -898,7 +894,7 @@ body.is-page-loading .page-content > * {
   font-size: 0.9rem;
 }
 
-/* === MULTI-SELECT === */
+
 
 .multi-select {
   position: relative;
@@ -935,7 +931,7 @@ body.is-page-loading .page-content > * {
     0 20px 64px rgba(6, 78, 59, 0.09);
 }
 
-/* display:grid overrides [hidden] — force hide */
+
 .multi-select-dropdown[hidden] {
   display: none !important;
 }
@@ -1013,13 +1009,13 @@ body.is-page-loading .page-content > * {
   font-size: 0.82rem;
 }
 
-/* === TABLE SCROLL SHELL === */
+
 
 .table-scroll-shell {
   width: 100%;
 }
 
-/* === TABULATOR SCROLLBAR === */
+
 
 .tabulator .tabulator-tableholder {
   scrollbar-width: thin !important;
@@ -1054,7 +1050,7 @@ body.is-page-loading .page-content > * {
   background: transparent;
 }
 
-/* === ECO TABULATOR THEME === */
+
 
 .tabulator .tabulator-header {
   background: linear-gradient(135deg, #043d2f 0%, #064e3b 35%, #085c47 65%, #0a6850 100%) !important;
@@ -1132,7 +1128,7 @@ body.is-page-loading .page-content > * {
   align-items: flex-start !important;
 }
 
-/* Text clamp — max 2 lines */
+
 .cell-clamp {
   display: -webkit-box;
   -webkit-box-orient: vertical;
@@ -1142,7 +1138,7 @@ body.is-page-loading .page-content > * {
   line-height: 1.45;
 }
 
-/* === BADGES === */
+
 
 .badge,
 .row-badge {
@@ -1176,7 +1172,7 @@ body.is-page-loading .page-content > * {
   font-weight: 800 !important;
 }
 
-/* === RECOMMENDATION ICONS + TOOLTIP === */
+
 
 .rec-icons-row {
   display: flex;
@@ -1265,7 +1261,7 @@ body.is-page-loading .page-content > * {
   top: -5px;
 }
 
-/* === CONFIG ACTION BUTTON === */
+
 
 .config-action-button {
   display: inline-flex;
@@ -1292,7 +1288,7 @@ body.is-page-loading .page-content > * {
   fill: currentColor;
 }
 
-/* === DRAWER === */
+
 
 .drawer,
 .modal {
@@ -1355,7 +1351,7 @@ body.is-page-loading .page-content > * {
   margin-bottom: 18px;
 }
 
-/* === COLUMNS LIST === */
+
 
 .columns-list {
   display: grid;
@@ -1429,7 +1425,7 @@ body.is-page-loading .page-content > * {
   accent-color: var(--accent);
 }
 
-/* === MODAL === */
+
 
 .modal-panel {
   left: 50%;
@@ -1452,7 +1448,7 @@ body.is-page-loading .page-content > * {
   transform: translate(-50%, -50%) scale(1);
 }
 
-/* === TABS — segmented control style === */
+
 
 .modal-tabs {
   display: grid;
@@ -1489,6 +1485,12 @@ body.is-page-loading .page-content > * {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 12px 16px;
+}
+
+@media (max-width: 360px) {
+  .manual-form-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .manual-form-grid .field + .field {
@@ -1529,7 +1531,7 @@ body.is-page-loading .page-content > * {
   font-weight: 600;
 }
 
-/* === UPLOAD DROPZONE === */
+
 
 .upload-dropzone {
   display: grid;
@@ -1585,7 +1587,7 @@ body.is-page-loading .page-content > * {
   margin-top: 20px;
 }
 
-/* === ICON BUTTON === */
+
 
 .icon-button {
   display: inline-flex;
@@ -1608,7 +1610,7 @@ body.is-page-loading .page-content > * {
   transform: scale(1.1);
 }
 
-/* === EMPTY STATE === */
+
 
 .empty-state {
   padding: 48px 20px;
@@ -1617,7 +1619,7 @@ body.is-page-loading .page-content > * {
   font-size: 1rem;
 }
 
-/* === ACCESSIBILITY === */
+
 
 .sr-only {
   position: absolute;
@@ -1631,7 +1633,7 @@ body.is-page-loading .page-content > * {
   border: 0;
 }
 
-/* === TOAST NOTIFICATIONS === */
+
 
 .toast-notification {
   position: fixed;
@@ -1705,7 +1707,7 @@ body.is-page-loading .page-content > * {
   opacity: 1;
 }
 
-/* === TABULATOR PAGINATION === */
+
 
 .tabulator .tabulator-footer {
   background: #e8f5f0 !important;
@@ -1804,7 +1806,7 @@ body.is-page-loading .page-content > * {
   cursor: default !important;
 }
 
-/* === PACKAGE DISPLAY === */
+
 
 .pkg-lines {
   display: flex;
@@ -1825,7 +1827,7 @@ body.is-page-loading .page-content > * {
   border: 1px solid rgba(5, 150, 105, 0.14);
 }
 
-/* === INLINE CELL EDITING === */
+
 
 .cell-editable {
   cursor: text;
@@ -1905,7 +1907,7 @@ body.is-page-loading .page-content > * {
   border-color: var(--accent-strong);
 }
 
-/* === EQUIPMENT MODAL === */
+
 
 .equip-modal-panel {
   width: min(100% - 24px, 680px);
@@ -2001,7 +2003,7 @@ body.is-page-loading .page-content > * {
   box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.12);
 }
 
-/* Equipment cell action button */
+
 .equip-action-btn {
   display: inline-flex;
   align-items: center;
@@ -2024,7 +2026,7 @@ body.is-page-loading .page-content > * {
   box-shadow: 0 4px 14px rgba(5, 150, 105, 0.22);
 }
 
-/* === PRICE DISPLAY === */
+
 
 .price-stack {
   display: inline-flex;
@@ -2045,7 +2047,7 @@ body.is-page-loading .page-content > * {
   color: var(--muted);
 }
 
-/* === KEYFRAME ANIMATIONS === */
+
 
 @keyframes toastSlideIn {
   from {
@@ -2069,7 +2071,7 @@ body.is-page-loading .page-content > * {
   }
 }
 
-/* === RESPONSIVE === */
+
 
 @media (max-width: 759px) {
   .skeleton-table-row {

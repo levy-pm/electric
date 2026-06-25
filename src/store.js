@@ -150,7 +150,6 @@ async function ensureMariaDbSchema() {
 
   await db.query(`ALTER TABLE uploads ADD COLUMN IF NOT EXISTS source_type VARCHAR(16) NOT NULL DEFAULT 'upload'`);
   await db.query(`ALTER TABLE uploads ADD COLUMN IF NOT EXISTS source_url TEXT NULL`);
-  await db.query(`ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS combustion_equivalents JSON NULL`);
 
   await db.query(`
     CREATE TABLE IF NOT EXISTS vehicles (
@@ -193,6 +192,8 @@ async function ensureMariaDbSchema() {
       CONSTRAINT fk_vehicles_upload FOREIGN KEY (upload_id) REFERENCES uploads(id) ON DELETE CASCADE
     ) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
   `);
+
+  await db.query(`ALTER TABLE vehicles ADD COLUMN IF NOT EXISTS combustion_equivalents JSON NULL`);
 
   await db.query(`
     CREATE TABLE IF NOT EXISTS equipment_items (

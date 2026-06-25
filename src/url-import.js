@@ -4,6 +4,10 @@ const path = require('path');
 const { randomUUID } = require('crypto');
 const { extractVehicleFromPdf, extractVehicleFromSourceText } = require('./gemini');
 const { normalizeVehicleExtraction } = require('./schema');
+const { config } = require('./config');
+const { assertPublicUrl } = require('./security');
+
+const URL_IMPORT_TIMEOUT_MS = 15000;
 
 const REQUEST_HEADERS = {
   'user-agent': 'electric.motometr.pl/1.0 (+https://electric.motometr.pl)',
@@ -109,23 +113,43 @@ function sumMoney(values) {
   return values.reduce((total, value) => total + (roundMoney(value) || 0), 0);
 }
 
+function assertWithinSizeLimit(response) {
+  const declared = Number(response.headers.get('content-length') || 0);
+  if (declared && declared > config.urlImportMaxBytes) {
+    throw new Error('Odpowiedz z linku przekracza dozwolony rozmiar.');
+  }
+}
+
+async function readLimitedText(response) {
+  assertWithinSizeLimit(response);
+  const text = await response.text();
+  if (text.length > config.urlImportMaxBytes) {
+    throw new Error('Odpowiedz z linku przekracza dozwolony rozmiar.');
+  }
+  return text;
+}
+
 async function fetchJson(url) {
+  await assertPublicUrl(url, { allowPrivate: config.urlImportAllowPrivate });
   const response = await fetch(url, {
     headers: REQUEST_HEADERS,
     redirect: 'follow',
+    signal: AbortSignal.timeout(URL_IMPORT_TIMEOUT_MS),
   });
 
   if (!response.ok) {
     throw new Error(`Nie udalo sie pobrac danych producenta (${response.status}).`);
   }
 
-  return response.json();
+  return JSON.parse(await readLimitedText(response));
 }
 
 async function fetchRemoteDocument(inputUrl, depth = 0) {
+  await assertPublicUrl(inputUrl, { allowPrivate: config.urlImportAllowPrivate });
   const response = await fetch(inputUrl, {
     headers: REQUEST_HEADERS,
     redirect: 'manual',
+    signal: AbortSignal.timeout(URL_IMPORT_TIMEOUT_MS),
   });
 
   if (response.status >= 300 && response.status < 400) {
@@ -149,7 +173,11 @@ async function fetchRemoteDocument(inputUrl, depth = 0) {
   const contentType = (response.headers.get('content-type') || '').toLowerCase();
 
   if (contentType.includes('application/pdf') || /\.pdf(?:$|\?)/i.test(finalUrl)) {
+    assertWithinSizeLimit(response);
     const buffer = Buffer.from(await response.arrayBuffer());
+    if (buffer.length > config.urlImportMaxBytes) {
+      throw new Error('Plik PDF z linku przekracza dozwolony rozmiar.');
+    }
     return {
       kind: 'pdf',
       finalUrl,
@@ -159,7 +187,7 @@ async function fetchRemoteDocument(inputUrl, depth = 0) {
     };
   }
 
-  const text = await response.text();
+  const text = await readLimitedText(response);
   const refreshUrl = extractMetaRefreshUrl(text, finalUrl);
 
   if (refreshUrl && refreshUrl !== finalUrl && depth < 2) {

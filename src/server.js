@@ -3,9 +3,9 @@ const path = require('path');
 const { randomUUID } = require('crypto');
 const express = require('express');
 const multer = require('multer');
-const rateLimit = require('express-rate-limit');
 const sanitizeFilename = require('sanitize-filename');
 const { config } = require('./config');
+const { securityHeaders, createRateLimiter } = require('./security');
 const { buildEquipmentEntries } = require('./equipment');
 const { extractVehicleFromPdf, findCombustionEquivalents } = require('./gemini');
 const { importVehicleFromUrl } = require('./url-import');
@@ -47,6 +47,10 @@ function createUploadMiddleware() {
     storage: diskStorage,
     limits: {
       fileSize: config.maxFileSizeMb * 1024 * 1024,
+      files: 1,
+      fields: 40,
+      fieldSize: 1024 * 1024,
+      headerPairs: 200,
     },
     fileFilter(_req, file, callback) {
       const isPdf = file.mimetype === 'application/pdf' || /\.pdf$/i.test(file.originalname || '');
@@ -139,12 +143,6 @@ function createSummary(payload, rateInfo = null) {
           stale: Boolean(rateInfo.stale),
         }
       : null,
-    recommendationModel: {
-      price: 0.4,
-      range: 0.3,
-      battery: 0.15,
-      equipment: 0.15,
-    },
   };
 }
 
@@ -265,22 +263,29 @@ async function createApp() {
 
   const app = express();
   const upload = createUploadMiddleware();
-  const uploadLimiter = rateLimit({
+  const uploadLimiter = createRateLimiter({
     windowMs: config.uploadRateLimitWindowMs,
-    limit: config.uploadRateLimitMax,
-    standardHeaders: true,
-    legacyHeaders: false,
-    message: { error: 'Limit uploadow zostal chwilowo osiagniety.' },
+    max: config.uploadRateLimitMax,
+    message: 'Limit uploadow zostal chwilowo osiagniety.',
+  });
+  const writeLimiter = createRateLimiter({
+    windowMs: config.writeRateLimitWindowMs,
+    max: config.writeRateLimitMax,
+    message: 'Zbyt wiele operacji zapisu. Sprobuj ponownie za chwile.',
+  });
+  const apiLimiter = createRateLimiter({
+    windowMs: config.apiRateLimitWindowMs,
+    max: config.apiRateLimitMax,
   });
 
   app.disable('x-powered-by');
-  app.use(express.json({ limit: '2mb' }));
-  app.use((req, res, next) => {
-    res.setHeader('X-Robots-Tag', 'noindex, nofollow, noarchive');
-    next();
-  });
+  app.set('trust proxy', config.trustProxy);
+  app.use(securityHeaders);
+  app.use(express.json({ limit: config.jsonBodyLimit }));
   app.use('/vendor/tabulator', express.static(path.join(config.rootDir, 'node_modules', 'tabulator-tables', 'dist')));
   app.use(express.static(path.join(config.rootDir, 'public')));
+
+  app.use('/api', apiLimiter);
 
   app.get('/robots.txt', (_req, res) => {
     res.type('text/plain').send('User-agent: *\nDisallow: /\n');
@@ -381,7 +386,7 @@ async function createApp() {
     });
   }));
 
-  app.post('/api/uploads/:uploadId/complete', asyncRoute(async (req, res) => {
+  app.post('/api/uploads/:uploadId/complete', writeLimiter, asyncRoute(async (req, res) => {
     const uploadEntry = await store.getUploadById(req.params.uploadId);
     if (!uploadEntry) {
       res.status(404).json({ error: 'Nie znaleziono importu.' });
@@ -529,6 +534,7 @@ async function createApp() {
     });
 
     const vehicle = {
+      id: randomUUID(),
       brand,
       model,
       versionName,
@@ -612,7 +618,7 @@ async function createApp() {
     }
   }));
 
-  app.delete('/api/vehicles/:id', asyncRoute(async (req, res) => {
+  app.delete('/api/vehicles/:id', writeLimiter, asyncRoute(async (req, res) => {
     try {
       await store.deleteVehicle(req.params.id);
       res.json({ message: 'Konfiguracja została usunięta.' });
@@ -625,7 +631,7 @@ async function createApp() {
     }
   }));
 
-  app.patch('/api/vehicles/:id', asyncRoute(async (req, res) => {
+  app.patch('/api/vehicles/:id', writeLimiter, asyncRoute(async (req, res) => {
     const { id } = req.params;
     const body = req.body || {};
     const patch = {};
@@ -662,7 +668,26 @@ async function createApp() {
   }));
 
   app.use((error, _req, res, _next) => {
-    const status = error.statusCode || (String(error.message || '').includes('PDF') ? 400 : 500);
+    const isMulterError = error && error.name === 'MulterError';
+    const status =
+      error.statusCode ||
+      (isMulterError || String(error.message || '').includes('PDF') ? 400 : 500);
+
+    if (isMulterError) {
+      const message =
+        error.code === 'LIMIT_FILE_SIZE'
+          ? `Plik jest za duzy. Maksymalny rozmiar to ${config.maxFileSizeMb} MB.`
+          : 'Nieprawidlowy przeslany plik.';
+      res.status(400).json({ error: message });
+      return;
+    }
+
+    if (status >= 500) {
+      console.error('Blad serwera:', error);
+      res.status(status).json({ error: 'Wystapil nieoczekiwany blad serwera.' });
+      return;
+    }
+
     res.status(status).json({
       error: error.message || 'Wystapil nieoczekiwany blad.',
     });

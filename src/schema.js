@@ -129,16 +129,6 @@ function deriveDisplayName(vehicle) {
     .join(' ');
 }
 
-/**
- * Wynik wyposażenia — liczba elementów wyposażenia z premią za aktywnie wybrane opcje.
- * Wartość jest używana jako metryka porównawcza (normalizacja min-max),
- * więc liczy się tylko względna kolejność, a nie wartości bezwzględne.
- *
- * Premie:
- *  - wyposażenie seryjne (standard): ×1 — wliczone w cenę bazową
- *  - dokupione opcje (additional):   ×2 — użytkownik aktywnie wybrał
- *  - pakiety wyposażenia (packages): ×3 — pakiety zawierają wiele funkcji
- */
 function calculateEquipmentScore(vehicle) {
   return (
     vehicle.standardEquipment.length +

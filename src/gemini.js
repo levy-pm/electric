@@ -456,7 +456,7 @@ async function findCombustionEquivalents(brand, model) {
       }
     }
   } catch {
-    // Brak odpowiedzi lub błąd parsowania — zwracamy pustą listę
+    return [];
   }
 
   return [];

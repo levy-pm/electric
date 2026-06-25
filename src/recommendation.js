@@ -1,31 +1,15 @@
-/**
- * System rekomendacji pojazdów elektrycznych.
- *
- * Scoring oparty na "value for money" — każdy pojazd oceniany jest przez pryzmat
- * tego, ile zasięgu, baterii i wyposażenia oferuje względem swojej ceny.
- * Normalizacja min-max gwarantuje, że żadna skala jednostek nie faworyzuje jednej cechy.
- * Etykiety liderów muszą dokładnie odpowiadać stałej LEADER_LABELS w public/app.js.
- */
-
-// ---------------------------------------------------------------------------
-// Wagi scoringu "value for money" — suma = 1.0
-// Każda metryka to stosunek cechy do ceny (np. km / 1000 PLN).
-// ---------------------------------------------------------------------------
 const SCORING_WEIGHTS = {
-  rangePerPrice:     0.40,  // km zasięgu WLTP na 1000 PLN — najważniejsze kryterium
-  batteryPerPrice:   0.30,  // kWh baterii na 1000 PLN
-  equipmentPerPrice: 0.20,  // wynik wyposażenia na 1000 PLN
-  efficiency:        0.10,  // niższe zużycie kWh/100 km → eko bonus
+  rangePerPrice: 0.40,
+  batteryPerPrice: 0.30,
+  equipmentPerPrice: 0.20,
+  efficiency: 0.10,
 };
 
-// Etykiety odznak liderów — muszą być identyczne z LEADER_LABELS w public/app.js
 const BADGE_BEST_PRICE = '💰 Najlepsza cena';
 const BADGE_BEST_RANGE = '🔋 Największy zasięg';
 const BADGE_BEST_BATTERY = '⚡ Największa bateria';
 const BADGE_BEST_POWER = '🚀 Największa moc';
 const BADGE_BEST_EQUIPMENT = '🌿 Najbogatsze wyposażenie';
-
-// ---------------------------------------------------------------------------
 
 function safeNumber(value) {
   if (typeof value === 'number' && Number.isFinite(value)) {
@@ -45,10 +29,6 @@ function safeNumber(value) {
   return null;
 }
 
-/**
- * Normalizuje wartość do przedziału [0, 1].
- * inverse=true gdy niższa wartość jest lepsza (np. cena, zużycie energii).
- */
 function normalizeForScore(value, min, max, inverse = false) {
   if (value === null || min === null || max === null) {
     return 0;
@@ -109,18 +89,13 @@ function buildBadges(vehicle, leaders) {
   return badges;
 }
 
-/**
- * Oblicza wskaźnik "value for money" dla jednego pojazdu.
- * Zwraca null gdy brakuje ceny (bez ceny nie można ocenić VfM).
- * Jednostka: cecha / 1000 PLN (ułatwia porównywalność liczb).
- */
 function computeValueRatios(vehicle) {
   const price = safeNumber(vehicle.totalPricePln);
   if (!price || price <= 0) {
     return { rangePerPrice: null, batteryPerPrice: null, equipmentPerPrice: null };
   }
 
-  const kPrice = price / 1000; // cena w tysiącach PLN
+  const kPrice = price / 1000;
   const range = safeNumber(vehicle.rangeWltpKm);
   const battery = safeNumber(vehicle.batteryCapacityKwh);
   const equipment = safeNumber(vehicle.equipmentScore);
@@ -135,7 +110,6 @@ function computeValueRatios(vehicle) {
 function enrichVehicles(vehicles) {
   const leaders = computeLeaders(vehicles);
 
-  // Oblicz współczynniki VfM dla każdego pojazdu, a następnie ustal min/max do normalizacji
   const withRatios = vehicles.map((v) => ({ ...v, ...computeValueRatios(v) }));
 
   const pick = (field) => withRatios.map((v) => v[field]).filter((x) => x !== null);
@@ -151,7 +125,6 @@ function enrichVehicles(vehicles) {
     const badges = buildBadges(vehicle, leaders);
     const efficiency = safeNumber(vehicle.energyConsumptionKwh100km);
 
-    // Wynik = ważona suma znormalizowanych wskaźników VfM
     const breakdown = {
       rangePerPrice:     normalizeForScore(vehicle.rangePerPrice,     minRangePerPrice,     maxRangePerPrice)     * SCORING_WEIGHTS.rangePerPrice,
       batteryPerPrice:   normalizeForScore(vehicle.batteryPerPrice,   minBatteryPerPrice,   maxBatteryPerPrice)   * SCORING_WEIGHTS.batteryPerPrice,
@@ -177,7 +150,6 @@ function enrichVehicles(vehicles) {
     if (b.recommendationScore !== a.recommendationScore) {
       return b.recommendationScore - a.recommendationScore;
     }
-    // Remis: tańszy wygrywa
     const priceA = safeNumber(a.totalPricePln) ?? Number.MAX_SAFE_INTEGER;
     const priceB = safeNumber(b.totalPricePln) ?? Number.MAX_SAFE_INTEGER;
     return priceA - priceB;

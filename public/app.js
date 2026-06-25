@@ -39,6 +39,7 @@ const state = {
   applyingLayout: false,
   tooltipElement: null,
   tooltipTarget: null,
+  importToken: 0,
 };
 
 const equipEdit = {
@@ -48,7 +49,6 @@ const equipEdit = {
   additional: [],
 };
 
-// Etykiety odznak liderów — muszą być identyczne z BADGE_* w src/recommendation.js
 const leaderLabels = {
   bestPrice: '💰 Najlepsza cena',
   bestRange: '🔋 Największy zasięg',
@@ -306,14 +306,8 @@ async function saveVehiclePatch(vehicleId, patch) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(patch),
   });
-  const payload = await response.json();
-  if (!response.ok) {
-    throw new Error(payload.error || 'Błąd podczas zapisywania.');
-  }
-  return payload;
+  return readApiPayload(response, 'Błąd podczas zapisywania.');
 }
-
-// === MODAL WYPOSAŻENIA ===
 
 function openEquipmentModal(rowData) {
   equipEdit.vehicleId = rowData.id;
@@ -432,7 +426,6 @@ function equipmentAddItem() {
   }
   input.value = '';
   renderEquipmentItems();
-  // Scroll to bottom of list
   const list = document.getElementById('equipmentItemsList');
   list.scrollTop = list.scrollHeight;
 }
@@ -440,7 +433,6 @@ function equipmentAddItem() {
 async function saveEquipmentModal() {
   collectEquipmentInputs();
 
-  // Odfiltruj puste
   equipEdit.standard = equipEdit.standard.filter(Boolean);
   equipEdit.additional = equipEdit.additional.filter(Boolean);
 
@@ -513,32 +505,6 @@ function openConfiguration(rowData) {
   }
 }
 
-function legacyShowNotification(message, isError = false, duration = 3000) {
-  // Remove existing notifications
-  const existingToasts = document.querySelectorAll('.toast-notification');
-  existingToasts.forEach(toast => toast.remove());
-
-  // Create new toast
-  const toast = document.createElement('div');
-  toast.className = `toast-notification ${isError ? 'toast-error' : 'toast-success'}`;
-  toast.innerHTML = `
-    <div class="toast-content">
-      <span class="toast-icon">${isError ? '⚠️' : '✅'}</span>
-      <span class="toast-message">${message}</span>
-    </div>
-    <button class="toast-close" onclick="this.parentElement.remove()">×</button>
-  `;
-
-  document.body.appendChild(toast);
-
-  // Auto remove after duration
-  setTimeout(() => {
-    if (toast.parentElement) {
-      toast.remove();
-    }
-  }, duration);
-}
-
 function showNotification(message, isError = false, duration = 3000) {
   const existingToasts = document.querySelectorAll('.toast-notification');
   existingToasts.forEach((toast) => toast.remove());
@@ -591,7 +557,6 @@ function configurationFormatter(cell) {
   `;
 }
 
-// Edytor textarea dla pakietów wyposażenia (wartość = tablica stringów)
 const packageEditor = function (cell, onRendered, success, cancel) {
   const values = cell.getValue();
   const el = document.createElement('textarea');
@@ -884,7 +849,22 @@ function getEditableColumnOverrides() {
       formatter: (cell) => editableClampFormatter(cell.getValue()),
       editor: 'input',
       editorParams: getTextEditorParams(),
-      cellEdited: makeTextCellEdited('displayName'),
+      cellEdited: async (cell) => {
+        const nextValue = String(cell.getValue() || '').trim();
+        const previousValue = String(cell.getOldValue() || '').trim();
+
+        if (!nextValue) {
+          cell.restoreOldValue();
+          showNotification('Nazwa nie może być pusta.', true);
+          return;
+        }
+
+        if (nextValue === previousValue) {
+          return;
+        }
+
+        await persistEditedCell(cell, { displayName: nextValue }, 'Nazwa zaktualizowana.');
+      },
     },
     totalPricePln: {
       formatter: priceCellFormatter('totalPricePln', 'totalPriceEur'),
@@ -1245,8 +1225,6 @@ function priceCellFormatter(fieldPln, fieldEur) {
 function getColumns() {
   const editableOverrides = getEditableColumnOverrides();
 
-  // widthGrow: ile wolnego miejsca dostaje kolumna (0 = nie rośnie, 1 = rośnie normalnie, 2 = rośnie podwójnie)
-  // widthShrink: czy może się kurczyć poniżej minWidth (domyślnie 1)
   return [
     {
       title: 'Rekomendacja',
@@ -1278,25 +1256,6 @@ function getColumns() {
       minWidth: 150,
       widthGrow: 2,
       formatter: (cell) => `<span class="cell-clamp cell-editable">${cell.getValue() ? escapeHtml(String(cell.getValue())) : '—'}</span>`,
-      editor: 'input',
-      cellEdited: async (cell) => {
-        const rowData = cell.getRow().getData();
-        const newName = String(cell.getValue() || '').trim();
-        if (!newName) {
-          cell.restoreOldValue();
-          showNotification('Nazwa nie może być pusta.', true);
-          return;
-        }
-        try {
-          await saveVehiclePatch(rowData.id, { displayName: newName });
-          showNotification('Nazwa zaktualizowana.');
-        } catch (err) {
-          cell.restoreOldValue();
-          showNotification(err.message, true);
-        }
-      },
-      editorParams: getTextEditorParams(),
-      cellEdited: makeTextCellEdited('displayName'),
     },
     {
       title: 'Gabaryt',
@@ -1544,14 +1503,12 @@ function applyColumnLayout(layout) {
 
   state.applyingLayout = true;
   try {
-    // Widoczność
     for (const { field, visible } of valid) {
       const col = state.table.getColumns().find((c) => c.getField() === field);
       if (!col) continue;
       visible ? col.show() : col.hide();
     }
 
-    // Kolejność — od końca, każda kolumna przesuwa się PRZED następną
     for (let i = valid.length - 2; i >= 0; i--) {
       state.table.moveColumn(valid[i].field, valid[i + 1].field, false);
     }
@@ -1584,7 +1541,7 @@ function renderColumnsDrawerContent() {
       const handle = document.createElement('span');
       handle.className = 'drag-handle';
       handle.setAttribute('aria-hidden', 'true');
-      handle.textContent = '\u22ee\u22ee'; // ⋮⋮
+      handle.textContent = '\u22ee\u22ee';
 
       const label = document.createElement('span');
       label.className = 'column-toggle-label';
@@ -1755,7 +1712,6 @@ function updateSummary(items) {
   const top = items[0];
   topCarName.textContent = [top.brand, top.model].filter(Boolean).join(' ') || top.displayName || 'Bez nazwy';
 
-  // Pokaż kluczowe metryki + wskaźnik VfM: koszt 1000 km zasięgu (tys. zł / 1000 km)
   const plnPer1000km =
     top.rangeWltpKm && top.totalPricePln && top.totalPricePln > 0
       ? Math.round(top.totalPricePln / top.rangeWltpKm)
@@ -1774,7 +1730,6 @@ function updateSummary(items) {
     .map((badge) => `<span class="badge">${escapeHtml(badge)}</span>`)
     .join('');
 
-  // Mapa: badge string → pierwszy pojazd z tą odznaką
   const leaderByBadge = {};
   items.forEach((item) => {
     (item.recommendationBadges || []).forEach((badge) => {
@@ -1933,7 +1888,6 @@ function resetColumnVisibility() {
 
   try { localStorage.removeItem(COLUMN_LAYOUT_KEY); } catch {}
 
-  // Przywróć domyślną kolejność i widoczność przez pełny rebuild kolumn
   state.table.setColumns(getColumns());
   renderColumnsDrawerContent();
 }
@@ -2031,6 +1985,8 @@ function openImportModal() {
 }
 
 function closeImportModal() {
+  state.importToken += 1;
+
   const modal = document.getElementById('importModal');
   if (modal.contains(document.activeElement)) {
     focusElement(state.modalReturnFocus || document.getElementById('uploadButton'));
@@ -2147,10 +2103,16 @@ async function loadCars() {
   renderColumnsDrawerContent();
 }
 
-async function waitForUploadCompletion(uploadId, fileName) {
+async function waitForUploadCompletion(uploadId, fileName, importToken) {
   const deadline = Date.now() + 15 * 60 * 1000;
 
   while (Date.now() < deadline) {
+    if (importToken !== undefined && importToken !== state.importToken) {
+      const cancelled = new Error('Import został anulowany.');
+      cancelled.cancelled = true;
+      throw cancelled;
+    }
+
     const response = await fetch(`/api/uploads/${encodeURIComponent(uploadId)}/status`);
     const payload = await readApiPayload(response, 'Nie udalo sie sprawdzic statusu importu.');
 
@@ -2173,7 +2135,7 @@ async function waitForUploadCompletion(uploadId, fileName) {
   throw new Error('Analiza pliku trwa dluzej niz zwykle. Sprobuj ponownie za chwile.');
 }
 
-async function uploadFile(file) {
+async function uploadFile(file, importToken) {
   const formData = new FormData();
   formData.append('configurationPdf', file);
 
@@ -2182,7 +2144,7 @@ async function uploadFile(file) {
     body: formData,
   });
   const payload = await readApiPayload(response, 'Nie udalo sie przyjac pliku PDF.');
-  return waitForUploadCompletion(payload.uploadId, file.name);
+  return waitForUploadCompletion(payload.uploadId, file.name, importToken);
 }
 
 function getPendingFilesLabel(files) {
@@ -2237,6 +2199,7 @@ async function submitImport() {
 async function submitImportBatch() {
   const confirmButton = document.getElementById('confirmImportButton');
   confirmButton.disabled = true;
+  const importToken = state.importToken;
 
   try {
     if (state.importMode === 'file') {
@@ -2252,12 +2215,15 @@ async function submitImportBatch() {
         updateImportStatus(`Analizuje plik ${index + 1}/${state.pendingFiles.length}: ${file.name}...`);
 
         try {
-          const payload = await uploadFile(file);
+          const payload = await uploadFile(file, importToken);
           successes.push({
             fileName: file.name,
             uploadId: payload.uploadId,
           });
         } catch (error) {
+          if (error.cancelled) {
+            return;
+          }
           failures.push({
             fileName: file.name,
             message: error.message,
@@ -2294,7 +2260,6 @@ async function submitImportBatch() {
       return;
     }
 
-    // Ręczny wpis
     const brand = document.getElementById('manualBrand').value.trim();
     const model = document.getElementById('manualModel').value.trim();
     if (!brand && !model) {
@@ -2352,10 +2317,6 @@ async function submitImportBatch() {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Modal usunięcia
-// ---------------------------------------------------------------------------
-
 let _pendingDeleteId = null;
 
 function openDeleteModal(rowData) {
@@ -2400,10 +2361,6 @@ async function confirmDelete() {
     btn.textContent = 'Usuń';
   }
 }
-
-// ---------------------------------------------------------------------------
-// Modal podglądu
-// ---------------------------------------------------------------------------
 
 function openPreviewModal(rowData) {
   const name = [rowData.brand, rowData.model, rowData.versionName].filter(Boolean).join(' ') || rowData.displayName || 'Konfiguracja';
@@ -2574,7 +2531,6 @@ function bindEvents() {
     }
   });
 
-  // Modal wyposażenia
   document.getElementById('closeEquipmentButton').addEventListener('click', closeEquipmentModal);
   document.getElementById('cancelEquipmentButton').addEventListener('click', closeEquipmentModal);
   document.getElementById('saveEquipmentButton').addEventListener('click', saveEquipmentModal);
@@ -2622,14 +2578,12 @@ function bindEvents() {
     .forEach((node) => node.addEventListener('click', closeImportModal));
   document.getElementById('confirmImportButton').addEventListener('click', submitImportBatch);
 
-  // Modal usunięcia
   document.getElementById('closeDeleteButton').addEventListener('click', closeDeleteModal);
   document.getElementById('cancelDeleteButton').addEventListener('click', closeDeleteModal);
   document.getElementById('confirmDeleteButton').addEventListener('click', confirmDelete);
   document.querySelectorAll('[data-close-delete-modal="true"]')
     .forEach((node) => node.addEventListener('click', closeDeleteModal));
 
-  // Modal podglądu
   document.getElementById('closePreviewButton').addEventListener('click', closePreviewModal);
   document.querySelectorAll('[data-close-preview-modal="true"]')
     .forEach((node) => node.addEventListener('click', closePreviewModal));
